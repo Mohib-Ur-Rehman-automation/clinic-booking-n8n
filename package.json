@@ -1,0 +1,15 @@
+{
+  "name": "clinic-booking-n8n",
+  "private": true,
+  "license": "MIT",
+  "description": "Tests for the Demo Family Clinic n8n workflows",
+  "scripts": {
+    "test": "node validate.js"
+  },
+  "dependencies": {
+    "luxon": "^3.5.0"
+  },
+  "devDependencies": {
+    "sanitize-html": "^2.18.1"
+  }
+}

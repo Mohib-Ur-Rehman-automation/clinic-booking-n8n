@@ -1,0 +1,292 @@
+{
+  "name": "d3. clinic-reminders",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "triggerAtHour": 8
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.3,
+      "position": [
+        0,
+        0
+      ],
+      "id": "8b6d25ad-4e2a-4860-a2ab-66e49f71b144",
+      "name": "Every Morning 8 AM"
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        -180
+      ],
+      "id": "369d2ddc-cd6e-440e-a0a4-09b8a320b231",
+      "name": "Run Now"
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "PICK_D0_CLINIC_CORE",
+          "mode": "list"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "action": "reminders",
+            "data": "={{ {} }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "action",
+              "displayName": "action",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string"
+            },
+            {
+              "id": "data",
+              "displayName": "data",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "object"
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.2,
+      "position": [
+        220,
+        -90
+      ],
+      "id": "beff785d-0e96-4cbc-a52f-8b56a1d628d3",
+      "name": "Due Reminders"
+    },
+    {
+      "parameters": {
+        "fromEmail": "={{ $json.email.from }}",
+        "toEmail": "={{ $json.email.to }}",
+        "subject": "={{ $json.email.subject }}",
+        "emailFormat": "both",
+        "text": "={{ $json.email.text }}",
+        "html": "={{ $json.email.html }}",
+        "options": {
+          "appendAttribution": false
+        }
+      },
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "position": [
+        440,
+        -90
+      ],
+      "id": "4ccb13c5-5663-4d3a-a227-de75a2044a77",
+      "name": "Send Emails",
+      "webhookId": "248f868b-004e-41df-a85d-6e6929467d49",
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "// d3 · Stamp: one row update per reminder, saying whether it went out.\n// Send Emails returns one result per email, in the same order as Due Reminders' items.\nconst failMsg = j => j.error ? String(j.error.message || j.error.description || j.error) : (Array.isArray(j.rejected) && j.rejected.length ? 'rejected by the mail server: ' + j.rejected.join(', ') : '');\nconst answers = $('Due Reminders').all();\n\nconst rows = [];\n$input.all().forEach((sent, i) => {\n  const a = answers[i].json;\n  if (a.kind !== 'due') return;                               // the \"Needs attention\" email isn't a booking\n  const err = failMsg(sent.json);\n  rows.push({ json: { booking_id: a.booking_id, reminder: err ? `Failed ${a.now}: ${err.slice(0, 200)}` : `Sent ${a.now}` } });\n});\nreturn rows;\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        660,
+        -200
+      ],
+      "id": "058c21e9-6484-489d-a0a4-60316908f9ab",
+      "name": "Stamp"
+    },
+    {
+      "parameters": {
+        "authentication": "serviceAccount",
+        "operation": "update",
+        "documentId": {
+          "__rl": true,
+          "value": "YOUR_SHEET_ID",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "Appointments",
+          "mode": "name"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "booking_id": "={{ $json.booking_id }}",
+            "reminder": "={{ $json.reminder }}"
+          },
+          "matchingColumns": [
+            "booking_id"
+          ],
+          "schema": [
+            {
+              "id": "booking_id",
+              "displayName": "booking_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "reminder",
+              "displayName": "reminder",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {
+          "cellFormat": "RAW"
+        }
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        880,
+        -200
+      ],
+      "id": "4b18bfaa-220f-49fc-ab05-0aab536b40f7",
+      "name": "Save Stamp"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Check Sends: after every email has been tried, fail loudly if any didn't go out, so e0 emails you.\n// Sits on its own branch BELOW the other one: n8n runs the top branch first, so stamps are saved before this runs.\nconst failMsg = j => j.error ? String(j.error.message || j.error.description || j.error) : (Array.isArray(j.rejected) && j.rejected.length ? 'rejected by the mail server: ' + j.rejected.join(', ') : '');\nconst ANSWERS = 'Due Reminders';                                 // the node whose items were emailed\nconst answers = $(ANSWERS).all();\nconst sends = $('Send Emails').all();\n\nconst failed = [];\nsends.forEach((s, i) => {\n  const err = failMsg(s.json);\n  if (!err) return;\n  const a = answers[i].json;\n  const who = a.kind === 'attention' ? 'the \"Needs attention\" email' : a.kind === 'doctor' ? `${a.doctor}'s list` : `${a.patient_name} (${a.booking_id})`;\n  failed.push(`${who}: ${err}`);\n});\nif (failed.length) {\n  throw new Error(`${failed.length} of ${sends.length} emails failed to send. Failed reminders are retried next morning. ${failed.join(' | ')}`);\n}\nreturn [{ json: { sent: sends.length } }];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        660,
+        60
+      ],
+      "id": "e4c7beed-3ed0-4912-a882-54011abec731",
+      "name": "Check Sends"
+    },
+    {
+      "parameters": {
+        "content": "## d3 · Morning Reminders\nEvery day at 8 AM (Pakistan time): d0 lists the bookings that need a reminder (tomorrow's, plus today's booked after yesterday's run; not cancelled, not already sent) and a \"Needs attention\" email for any row that can't get one, naming the row and what's wrong. That email also lists every upcoming booking that falls on a day its doctor is away (Closures), every morning until it's moved or cancelled. Patients are never emailed about it automatically.\n\nSend Emails sends them all and keeps going if one fails. Stamp writes `Sent … PKT` or `Failed … PKT: reason` into the reminder column. Failed ones are retried the next morning; sent ones never repeat.\n\nTo test: in Due Reminders set data to {{ { test_now: '2026-10-19 08:00' } }}, run, then set it back to {{ {} }}.",
+        "width": 900,
+        "height": 300,
+        "color": 2
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -20,
+        -560
+      ],
+      "id": "2ab94690-0477-4dba-ac00-91b81968892d",
+      "name": "Note: Overview"
+    },
+    {
+      "parameters": {
+        "content": "### Keep Check Sends below Stamp\nn8n runs the top branch first, so the stamps are saved before Check Sends looks. If any email failed, Check Sends stops the run with the names, and e0 emails you.",
+        "width": 520,
+        "height": 160,
+        "color": 3
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        600,
+        220
+      ],
+      "id": "699c0090-1851-4f70-a9ff-8cb70b7a2369",
+      "name": "Note: Branch order"
+    }
+  ],
+  "connections": {
+    "Every Morning 8 AM": {
+      "main": [
+        [
+          {
+            "node": "Due Reminders",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Run Now": {
+      "main": [
+        [
+          {
+            "node": "Due Reminders",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Due Reminders": {
+      "main": [
+        [
+          {
+            "node": "Send Emails",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Emails": {
+      "main": [
+        [
+          {
+            "node": "Stamp",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Check Sends",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Stamp": {
+      "main": [
+        [
+          {
+            "node": "Save Stamp",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "timezone": "Asia/Karachi",
+    "callerPolicy": "workflowsFromSameOwner"
+  },
+  "tags": []
+}

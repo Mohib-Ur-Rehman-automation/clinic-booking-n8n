@@ -1,0 +1,927 @@
+{
+  "name": "d1. clinic-booking",
+  "nodes": [
+    {
+      "parameters": {
+        "formTitle": "Book an appointment",
+        "formDescription": "Choose a doctor and a day. Next, you'll see the times that are still free.",
+        "formFields": {
+          "values": [
+            {
+              "fieldType": "html",
+              "html": "<ol><li><b>Your details</b></li><li>Choose a time</li><li>Confirmed</li></ol>"
+            },
+            {
+              "fieldLabel": "Patient name",
+              "placeholder": "Full name",
+              "requiredField": true
+            },
+            {
+              "fieldLabel": "Phone",
+              "placeholder": "0300 1234567",
+              "requiredField": true
+            },
+            {
+              "fieldLabel": "Email",
+              "fieldType": "email",
+              "placeholder": "Your confirmation is sent here",
+              "requiredField": true
+            },
+            {
+              "fieldLabel": "Doctor",
+              "fieldType": "dropdown",
+              "fieldOptions": {
+                "values": [
+                  {
+                    "option": "Dr. Ayesha Khan"
+                  },
+                  {
+                    "option": "Dr. Usman Ali"
+                  }
+                ]
+              },
+              "requiredField": true
+            },
+            {
+              "fieldLabel": "Visit type",
+              "fieldType": "dropdown",
+              "fieldOptions": {
+                "values": [
+                  {
+                    "option": "Check-up"
+                  },
+                  {
+                    "option": "Follow-up"
+                  },
+                  {
+                    "option": "Consultation"
+                  }
+                ]
+              },
+              "requiredField": true
+            },
+            {
+              "fieldLabel": "Preferred date",
+              "fieldType": "date",
+              "requiredField": true
+            }
+          ]
+        },
+        "options": {
+          "path": "clinic-booking",
+          "appendAttribution": false,
+          "buttonLabel": "See free times",
+          "customCss": "@import url('https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;700;800&display=swap');\nhtml{background:#FFF6EC url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='3' stitchTiles='stitch'/%3E %3CfeColorMatrix values='0 0 0 0 .06 0 0 0 0 .09 0 0 0 0 .16 0 0 0 .09 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E\") repeat}\nbody{background:transparent !important;min-height:100vh;position:relative;overflow-x:hidden}\nbody::before,body::after{content:'';position:fixed;z-index:0;pointer-events:none;background-repeat:no-repeat;background-size:contain}\nbody::before{top:0;right:0;width:min(46vw,520px);height:min(38vw,420px);background-image:url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 520 420'%3E %3Cpath d='M520 0H120c-18 64 22 130 104 150 86 21 118 96 196 150 40 28 76 38 100 40z' fill='%23FFE2C2'/%3E %3Cpath d='M520 0H286c-14 58 18 112 92 128 62 13 104 50 142 96z' fill='%230F766E'/%3E %3Ccircle cx='300' cy='64' r='44' fill='%23FF8B5A'/%3E %3Cpath d='M520 236c-34-6-64 4-82 30 30 6 58 22 82 46z' fill='%236B8F7A' opacity='.75'/%3E%3C/svg%3E\");background-position:top right}\nbody::after{bottom:0;left:0;width:min(42vw,480px);height:min(36vw,400px);background-image:url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 480 400'%3E %3Cpath d='M0 400V96c74 6 124 60 150 128 22 58 74 118 168 176z' fill='%23FFE2C2'/%3E %3Cpath d='M0 400V214c58 2 98 46 116 104 10 34 28 62 56 82z' fill='%236B8F7A' opacity='.85'/%3E %3Ccircle cx='212' cy='352' r='26' fill='%23FF8B5A'/%3E %3Cpath d='M0 150c40 4 66 26 78 58-30-2-58-16-78-36z' fill='%230F766E'/%3E%3C/svg%3E\");background-position:bottom left}\n@media (max-width:640px){body::before{width:70vw;height:56vw;opacity:.85}body::after{width:62vw;height:52vw;opacity:.85}}\n:root{--font-family:'Figtree','Segoe UI',Helvetica,Arial,sans-serif;--font-size-label:15px;--font-size-input:16px;--font-size-header:28px;--font-size-paragraph:15px;\n--color-background:transparent;--color-card-bg:#FFFFFF;--color-card-border:#E8D9C6;--color-card-shadow:rgba(15,23,42,0.08);--color-header:#0F766E;--color-label:#0F172A;\n--color-input-border:#D9C7B2;--color-input-text:#0F172A;--color-focus-border:#0F766E;--color-submit-btn-bg:#0F766E;--color-submit-btn-text:#FFFFFF;\n--color-required:#B42318;--color-error:#B42318;--color-link:#475569;--color-html-text:#0F172A;--color-html-link:#0F766E;\n--border-radius-card:16px;--border-radius-input:10px;--container-width:500px;--padding-card:28px}\n.container{position:relative;z-index:1;padding:28px 16px 40px !important;max-width:100%}\n.container section::before{content:'Demo Family Clinic';display:block;padding:6px 0 6px 46px;margin:0 0 18px;min-height:36px;line-height:24px;font:800 17px/24px var(--font-family);color:#0F172A;text-align:left;background:url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 40 40' aria-hidden='true'%3E%3Crect width='40' height='40' rx='11' fill='%230F766E'/%3E %3Cpath d='M9 30c0-10 7.5-17.5 18.5-18.5C26.5 22.5 19 30 9 30z' fill='%23FFE2C2'/%3E%3Cpath d='M9.5 29.5 21 18' stroke='%230F766E' stroke-width='1.6' stroke-linecap='round'/%3E %3Ccircle cx='29' cy='11' r='5' fill='%23FF8B5A'/%3E%3C/svg%3E\") left center/36px 36px no-repeat}\n.card{box-shadow:0 18px 40px -18px rgba(15,23,42,.25) !important}\n.form-header{text-align:left}\n.form-header h1{font-weight:800 !important;letter-spacing:-.3px}\n.form-header p{color:#0F172A !important}\n#submit-btn{font-weight:700;letter-spacing:.2px}\n#submit-btn:hover{filter:brightness(1.1)}\ndiv.html{margin-bottom:6px}\ndiv.html ol{display:flex;flex-direction:row !important;gap:6px;list-style:none;padding:0 !important;margin:0 0 4px !important;counter-reset:s;line-height:1.3 !important}\ndiv.html ol li{flex:1;counter-increment:s;font-size:12.5px;color:#475569;border-top:4px solid #E8D9C6;padding-top:7px;margin:0 !important;text-align:left}\ndiv.html ol li::before{content:counter(s) '. '}\ndiv.html ol li:has(i){border-top-color:#6B8F7A}\ndiv.html ol li:has(i)::before{content:'\\2713  '}\ndiv.html ol li:has(b){border-top-color:#0F766E;color:#0F172A}\ndiv.html ol li b,div.html ol li i{font-style:normal;font-weight:700}\ndiv.html div{display:flex;align-items:center;gap:14px;background:#FFF1E4;border-radius:12px;padding:12px 14px}\ndiv.html div h3{line-height:1 !important;flex:0 0 48px;width:48px;height:48px;margin:0 !important;border-radius:50%;background:#0F766E;color:#FFFFFF !important;font-size:17px !important;font-weight:800;display:flex;align-items:center;justify-content:center;letter-spacing:.5px}\ndiv.html div p{margin:0 !important;font-size:14px;line-height:1.45;color:#475569}\ndiv.html div p b{color:#0F172A;font-size:16px}\n@media only screen and (max-width:500px){.container{width:100% !important;padding:20px 14px 32px !important}.card{padding:22px 18px !important;border:1px solid #E8D9C6 !important;border-radius:16px !important;background:#FFFFFF !important}}"
+        }
+      },
+      "type": "n8n-nodes-base.formTrigger",
+      "typeVersion": 2.6,
+      "position": [
+        0,
+        0
+      ],
+      "id": "0bcbda7e-f1c9-4186-abcb-963f851f57bf",
+      "name": "Booking Form",
+      "webhookId": "5f99d977-cc53-4938-ab8a-9754ee09a723"
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "PICK_D0_CLINIC_CORE",
+          "mode": "list"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "action": "slots",
+            "data": "={{ $json }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "action",
+              "displayName": "action",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string"
+            },
+            {
+              "id": "data",
+              "displayName": "data",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "object"
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.2,
+      "position": [
+        220,
+        0
+      ],
+      "id": "21d7d88d-1af3-4d3d-a0f9-3a19b22c5aa6",
+      "name": "Find Times"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "0749936f-dcd5-4a16-acfb-6ec6e506a016",
+              "leftValue": "={{ $json.status }}",
+              "rightValue": "choose",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        440,
+        0
+      ],
+      "id": "eb97e225-e40f-4fa9-a262-a1672d539244",
+      "name": "Can Choose?"
+    },
+    {
+      "parameters": {
+        "defineForm": "json",
+        "jsonOutput": "={{ $('Find Times').first().json.form.fields }}",
+        "limitWaitTime": true,
+        "limitType": "afterTimeInterval",
+        "resumeAmount": 30,
+        "resumeUnit": "minutes",
+        "options": {
+          "formTitle": "={{ $('Find Times').first().json.form.title }}",
+          "formDescription": "={{ $('Find Times').first().json.form.description }}",
+          "buttonLabel": "Book this time",
+          "customCss": "@import url('https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;700;800&display=swap');\nhtml{background:#FFF6EC url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='3' stitchTiles='stitch'/%3E %3CfeColorMatrix values='0 0 0 0 .06 0 0 0 0 .09 0 0 0 0 .16 0 0 0 .09 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E\") repeat}\nbody{background:transparent !important;min-height:100vh;position:relative;overflow-x:hidden}\nbody::before,body::after{content:'';position:fixed;z-index:0;pointer-events:none;background-repeat:no-repeat;background-size:contain}\nbody::before{top:0;right:0;width:min(46vw,520px);height:min(38vw,420px);background-image:url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 520 420'%3E %3Cpath d='M520 0H120c-18 64 22 130 104 150 86 21 118 96 196 150 40 28 76 38 100 40z' fill='%23FFE2C2'/%3E %3Cpath d='M520 0H286c-14 58 18 112 92 128 62 13 104 50 142 96z' fill='%230F766E'/%3E %3Ccircle cx='300' cy='64' r='44' fill='%23FF8B5A'/%3E %3Cpath d='M520 236c-34-6-64 4-82 30 30 6 58 22 82 46z' fill='%236B8F7A' opacity='.75'/%3E%3C/svg%3E\");background-position:top right}\nbody::after{bottom:0;left:0;width:min(42vw,480px);height:min(36vw,400px);background-image:url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 480 400'%3E %3Cpath d='M0 400V96c74 6 124 60 150 128 22 58 74 118 168 176z' fill='%23FFE2C2'/%3E %3Cpath d='M0 400V214c58 2 98 46 116 104 10 34 28 62 56 82z' fill='%236B8F7A' opacity='.85'/%3E %3Ccircle cx='212' cy='352' r='26' fill='%23FF8B5A'/%3E %3Cpath d='M0 150c40 4 66 26 78 58-30-2-58-16-78-36z' fill='%230F766E'/%3E%3C/svg%3E\");background-position:bottom left}\n@media (max-width:640px){body::before{width:70vw;height:56vw;opacity:.85}body::after{width:62vw;height:52vw;opacity:.85}}\n:root{--font-family:'Figtree','Segoe UI',Helvetica,Arial,sans-serif;--font-size-label:15px;--font-size-input:16px;--font-size-header:28px;--font-size-paragraph:15px;\n--color-background:transparent;--color-card-bg:#FFFFFF;--color-card-border:#E8D9C6;--color-card-shadow:rgba(15,23,42,0.08);--color-header:#0F766E;--color-label:#0F172A;\n--color-input-border:#D9C7B2;--color-input-text:#0F172A;--color-focus-border:#0F766E;--color-submit-btn-bg:#0F766E;--color-submit-btn-text:#FFFFFF;\n--color-required:#B42318;--color-error:#B42318;--color-link:#475569;--color-html-text:#0F172A;--color-html-link:#0F766E;\n--border-radius-card:16px;--border-radius-input:10px;--container-width:500px;--padding-card:28px}\n.container{position:relative;z-index:1;padding:28px 16px 40px !important;max-width:100%}\n.container section::before{content:'Demo Family Clinic';display:block;padding:6px 0 6px 46px;margin:0 0 18px;min-height:36px;line-height:24px;font:800 17px/24px var(--font-family);color:#0F172A;text-align:left;background:url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 40 40' aria-hidden='true'%3E%3Crect width='40' height='40' rx='11' fill='%230F766E'/%3E %3Cpath d='M9 30c0-10 7.5-17.5 18.5-18.5C26.5 22.5 19 30 9 30z' fill='%23FFE2C2'/%3E%3Cpath d='M9.5 29.5 21 18' stroke='%230F766E' stroke-width='1.6' stroke-linecap='round'/%3E %3Ccircle cx='29' cy='11' r='5' fill='%23FF8B5A'/%3E%3C/svg%3E\") left center/36px 36px no-repeat}\n.card{box-shadow:0 18px 40px -18px rgba(15,23,42,.25) !important}\n.form-header{text-align:left}\n.form-header h1{font-weight:800 !important;letter-spacing:-.3px}\n.form-header p{color:#0F172A !important}\n#submit-btn{font-weight:700;letter-spacing:.2px}\n#submit-btn:hover{filter:brightness(1.1)}\ndiv.html{margin-bottom:6px}\ndiv.html ol{display:flex;flex-direction:row !important;gap:6px;list-style:none;padding:0 !important;margin:0 0 4px !important;counter-reset:s;line-height:1.3 !important}\ndiv.html ol li{flex:1;counter-increment:s;font-size:12.5px;color:#475569;border-top:4px solid #E8D9C6;padding-top:7px;margin:0 !important;text-align:left}\ndiv.html ol li::before{content:counter(s) '. '}\ndiv.html ol li:has(i){border-top-color:#6B8F7A}\ndiv.html ol li:has(i)::before{content:'\\2713  '}\ndiv.html ol li:has(b){border-top-color:#0F766E;color:#0F172A}\ndiv.html ol li b,div.html ol li i{font-style:normal;font-weight:700}\ndiv.html div{display:flex;align-items:center;gap:14px;background:#FFF1E4;border-radius:12px;padding:12px 14px}\ndiv.html div h3{line-height:1 !important;flex:0 0 48px;width:48px;height:48px;margin:0 !important;border-radius:50%;background:#0F766E;color:#FFFFFF !important;font-size:17px !important;font-weight:800;display:flex;align-items:center;justify-content:center;letter-spacing:.5px}\ndiv.html div p{margin:0 !important;font-size:14px;line-height:1.45;color:#475569}\ndiv.html div p b{color:#0F172A;font-size:16px}\n@media only screen and (max-width:500px){.container{width:100% !important;padding:20px 14px 32px !important}.card{padding:22px 18px !important;border:1px solid #E8D9C6 !important;border-radius:16px !important;background:#FFFFFF !important}}"
+        }
+      },
+      "type": "n8n-nodes-base.form",
+      "typeVersion": 2.5,
+      "position": [
+        660,
+        -120
+      ],
+      "id": "bdf11d9a-139f-4cbc-add7-fb89cdf4f806",
+      "name": "Choose Time",
+      "webhookId": "3b28847a-a8ea-4a01-ae63-42b2ef2b8259"
+    },
+    {
+      "parameters": {
+        "action": "generate",
+        "dataPropertyName": "cancel_token",
+        "encodingType": "uuid"
+      },
+      "type": "n8n-nodes-base.crypto",
+      "typeVersion": 2,
+      "position": [
+        880,
+        -120
+      ],
+      "id": "07b544f1-32d6-468d-a60a-9025451aeba9",
+      "name": "Make Cancel Token"
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "PICK_D0_CLINIC_CORE",
+          "mode": "list"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "action": "check",
+            "data": "={{ { request: $('Find Times').first().json, chosen: $('Choose Time').first().json.Time ?? '', cancel_token: $json.cancel_token } }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "action",
+              "displayName": "action",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string"
+            },
+            {
+              "id": "data",
+              "displayName": "data",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "object"
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.2,
+      "position": [
+        1100,
+        -120
+      ],
+      "id": "4d351820-fc8e-481c-ab23-dbda3cd14a95",
+      "name": "Final Check"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "edae8063-6c2a-47e3-af1b-9db87d0ef9dd",
+              "leftValue": "={{ $json.status }}",
+              "rightValue": "book",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1320,
+        -120
+      ],
+      "id": "f311d7ec-2f15-40e0-ab7a-e71b91ab56de",
+      "name": "Book It?"
+    },
+    {
+      "parameters": {
+        "authentication": "serviceAccount",
+        "operation": "appendOrUpdate",
+        "documentId": {
+          "__rl": true,
+          "value": "YOUR_SHEET_ID",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "Appointments",
+          "mode": "name"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "booking_id": "={{ $json.row.booking_id }}",
+            "booked_at": "={{ $json.row.booked_at }}",
+            "status": "={{ $json.row.status }}",
+            "doctor": "={{ $json.row.doctor }}",
+            "date": "={{ $json.row.date }}",
+            "day": "={{ $json.row.day }}",
+            "time": "={{ $json.row.time }}",
+            "patient_name": "={{ $json.row.patient_name }}",
+            "phone": "={{ $json.row.phone }}",
+            "email": "={{ $json.row.email }}",
+            "visit_type": "={{ $json.row.visit_type }}",
+            "reminder": "={{ $json.row.reminder }}",
+            "cancel_token": "={{ $json.row.cancel_token }}",
+            "cancelled_at": "={{ $json.row.cancelled_at }}"
+          },
+          "matchingColumns": [
+            "booking_id"
+          ],
+          "schema": [
+            {
+              "id": "booking_id",
+              "displayName": "booking_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "booked_at",
+              "displayName": "booked_at",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "status",
+              "displayName": "status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "doctor",
+              "displayName": "doctor",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "date",
+              "displayName": "date",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "day",
+              "displayName": "day",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "time",
+              "displayName": "time",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "patient_name",
+              "displayName": "patient_name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "phone",
+              "displayName": "phone",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "email",
+              "displayName": "email",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "visit_type",
+              "displayName": "visit_type",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "reminder",
+              "displayName": "reminder",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "cancel_token",
+              "displayName": "cancel_token",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "cancelled_at",
+              "displayName": "cancelled_at",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {
+          "cellFormat": "RAW"
+        }
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        1540,
+        -240
+      ],
+      "id": "5fcabff3-bca5-46e1-a492-5a4ad7295c7e",
+      "name": "Save Appointment"
+    },
+    {
+      "parameters": {
+        "fromEmail": "={{ $('Final Check').first().json.email.from }}",
+        "toEmail": "={{ $('Final Check').first().json.email.to }}",
+        "subject": "={{ $('Final Check').first().json.email.subject }}",
+        "emailFormat": "both",
+        "text": "={{ $('Final Check').first().json.email.text }}",
+        "html": "={{ $('Final Check').first().json.email.html }}",
+        "options": {
+          "appendAttribution": false
+        }
+      },
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "position": [
+        1760,
+        -240
+      ],
+      "id": "fef0794a-7121-42f8-afee-47f326cdacf2",
+      "name": "Send Confirmation",
+      "webhookId": "83bf8ac1-ab3e-4bd4-a684-8cb014d66a2d",
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "// d1 · Finish: whichever way the booking went, pick the page to show and build the Request Log row.\n// Paths: refused on page 1 · stopped at the final check · booked (email sent or failed).\nconst failMsg = j => j.error ? String(j.error.message || j.error.description || j.error) : (Array.isArray(j.rejected) && j.rejected.length ? 'rejected by the mail server: ' + j.rejected.join(', ') : '');\n\nconst req = $('Find Times').first().json;                                    // answer to page 1\nconst chk = $('Final Check').isExecuted ? $('Final Check').first().json : null;  // answer after page 2\nconst last = chk || req;\n\nlet html = last.page_html;\nlet emailStatus = '';\nif (chk && chk.status === 'book') {\n  const err = failMsg($('Send Confirmation').first().json);\n  emailStatus = err ? 'Failed: ' + err : 'Sent';\n  if (err) html = chk.page_html_email_failed;\n}\nconst p = req.patient || {}, typed = req.typed || {};\nreturn [{ json: {\n  html,\n  log: {\n    booking_id: req.booking_id,\n    requested_at: req.requested_at,\n    finished_at: last.now,\n    outcome: last.outcome,\n    doctor: req.doctor,\n    requested_date: req.requested_date || typed.date || '',\n    offered_date: req.date || '',\n    chosen_time: chk && chk.time ? chk.time : '',\n    patient_name: p.name || typed.name || '',\n    phone: p.phone || typed.phone || '',\n    email: p.email || typed.email || '',\n    visit_type: req.visit_type,\n    reason: last.reason || '',\n    confirmation_email: emailStatus,\n  },\n}}];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1980,
+        0
+      ],
+      "id": "99ec5df8-1cdd-4208-ab61-73867784dff3",
+      "name": "Finish"
+    },
+    {
+      "parameters": {
+        "authentication": "serviceAccount",
+        "operation": "appendOrUpdate",
+        "documentId": {
+          "__rl": true,
+          "value": "YOUR_SHEET_ID",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "Request Log",
+          "mode": "name"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "booking_id": "={{ $json.log.booking_id }}",
+            "requested_at": "={{ $json.log.requested_at }}",
+            "finished_at": "={{ $json.log.finished_at }}",
+            "outcome": "={{ $json.log.outcome }}",
+            "doctor": "={{ $json.log.doctor }}",
+            "requested_date": "={{ $json.log.requested_date }}",
+            "offered_date": "={{ $json.log.offered_date }}",
+            "chosen_time": "={{ $json.log.chosen_time }}",
+            "patient_name": "={{ $json.log.patient_name }}",
+            "phone": "={{ $json.log.phone }}",
+            "email": "={{ $json.log.email }}",
+            "visit_type": "={{ $json.log.visit_type }}",
+            "reason": "={{ $json.log.reason }}",
+            "confirmation_email": "={{ $json.log.confirmation_email }}"
+          },
+          "matchingColumns": [
+            "booking_id"
+          ],
+          "schema": [
+            {
+              "id": "booking_id",
+              "displayName": "booking_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "requested_at",
+              "displayName": "requested_at",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "finished_at",
+              "displayName": "finished_at",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "outcome",
+              "displayName": "outcome",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "doctor",
+              "displayName": "doctor",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "requested_date",
+              "displayName": "requested_date",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "offered_date",
+              "displayName": "offered_date",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "chosen_time",
+              "displayName": "chosen_time",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "patient_name",
+              "displayName": "patient_name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "phone",
+              "displayName": "phone",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "email",
+              "displayName": "email",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "visit_type",
+              "displayName": "visit_type",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "reason",
+              "displayName": "reason",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "confirmation_email",
+              "displayName": "confirmation_email",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {
+          "cellFormat": "RAW"
+        }
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        2200,
+        0
+      ],
+      "id": "425b76bb-40c7-4d76-afa9-e45ca00ba67a",
+      "name": "Log Request"
+    },
+    {
+      "parameters": {
+        "operation": "completion",
+        "respondWith": "showText",
+        "responseText": "={{ $('Finish').first().json.html }}",
+        "options": {
+          "formTitle": "Demo Family Clinic"
+        }
+      },
+      "type": "n8n-nodes-base.form",
+      "typeVersion": 2.5,
+      "position": [
+        2420,
+        0
+      ],
+      "id": "1c02e5ea-6db4-4af3-a7dd-0a1ed9ecb710",
+      "name": "Done",
+      "webhookId": "8f08c945-2b94-4e2c-a4ce-ef9c010c6c72"
+    },
+    {
+      "parameters": {
+        "content": "## d1 · Clinic Booking\nPatient fills page 1 → sees only the times that are free → picks one → it's checked again and saved → confirmation email → result page. Every request ends up as one row in Request Log, whatever happened.\n\nRules and pages come from **d0 · clinic-core**. Errors email you through **e0**.\nForm URL: /form/clinic-booking",
+        "width": 700,
+        "height": 220,
+        "color": 2
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -20,
+        -560
+      ],
+      "id": "2ab94690-0477-4dba-ac00-91b81968892d",
+      "name": "Note: Overview"
+    },
+    {
+      "parameters": {
+        "content": "### 1. Find times\nd0 checks the details (name, Pakistani mobile, email, real date) and lists the doctor's free times that day. If that day is closed, full or past, it offers the next day that has free times and says why. If nothing can be offered, Can Choose? goes to Finish with the reason.",
+        "width": 640,
+        "height": 200,
+        "color": 5
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -20,
+        180
+      ],
+      "id": "d9492b74-13c5-4a7f-aece-4cfbb0ba7919",
+      "name": "Note: 1 Find times"
+    },
+    {
+      "parameters": {
+        "content": "### 2. Pick and check\nChoose Time shows the free times (built by d0) and waits up to 30 minutes. Final Check asks d0 again, because someone may have booked that time while the patient was choosing. It also catches \"too close now\" and a closure added meanwhile. Make Cancel Token gives the booking a secret for its cancel link.",
+        "width": 840,
+        "height": 200,
+        "color": 6
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        640,
+        -440
+      ],
+      "id": "b2aacee3-390b-48cc-a9bf-d243a3f7afbc",
+      "name": "Note: 2 Pick and check"
+    },
+    {
+      "parameters": {
+        "content": "### 3. Save and confirm\nSave Appointment writes the row (append-or-update on booking_id, so a retry never duplicates it). Send Confirmation continues even if the email fails: the patient still sees \"You're booked\", with a note, and the failure is logged.",
+        "width": 640,
+        "height": 200,
+        "color": 4
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        1520,
+        -480
+      ],
+      "id": "3ea0ccfc-c9a9-48a3-adc3-e8de5403b932",
+      "name": "Note: 3 Save and confirm"
+    },
+    {
+      "parameters": {
+        "content": "### 4. Finish\nFinish picks the result page for whatever happened and builds the Request Log row (outcome, reason, whether the email went out). Done shows that page.",
+        "width": 640,
+        "height": 160,
+        "color": 7
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        1960,
+        180
+      ],
+      "id": "4f347374-6c11-4e2b-a783-13a2cef65d3a",
+      "name": "Note: 4 Finish"
+    }
+  ],
+  "connections": {
+    "Booking Form": {
+      "main": [
+        [
+          {
+            "node": "Find Times",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Find Times": {
+      "main": [
+        [
+          {
+            "node": "Can Choose?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Can Choose?": {
+      "main": [
+        [
+          {
+            "node": "Choose Time",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Finish",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Choose Time": {
+      "main": [
+        [
+          {
+            "node": "Make Cancel Token",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Make Cancel Token": {
+      "main": [
+        [
+          {
+            "node": "Final Check",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Final Check": {
+      "main": [
+        [
+          {
+            "node": "Book It?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Book It?": {
+      "main": [
+        [
+          {
+            "node": "Save Appointment",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Finish",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Save Appointment": {
+      "main": [
+        [
+          {
+            "node": "Send Confirmation",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Confirmation": {
+      "main": [
+        [
+          {
+            "node": "Finish",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Finish": {
+      "main": [
+        [
+          {
+            "node": "Log Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Log Request": {
+      "main": [
+        [
+          {
+            "node": "Done",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "timezone": "Asia/Karachi",
+    "callerPolicy": "workflowsFromSameOwner"
+  },
+  "tags": []
+}

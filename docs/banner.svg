@@ -1,0 +1,40 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="360" viewBox="0 0 1280 360" role="img" aria-label="Demo Family Clinic: appointment booking built in n8n">
+  <defs>
+    <filter id="grain"><feTurbulence type="fractalNoise" baseFrequency=".85" numOctaves="3" stitchTiles="stitch"/><feColorMatrix values="0 0 0 0 .06 0 0 0 0 .09 0 0 0 0 .16 0 0 0 .07 0"/></filter>
+    <clipPath id="card"><rect width="1280" height="360" rx="24"/></clipPath>
+  </defs>
+  <g clip-path="url(#card)">
+    <rect width="1280" height="360" fill="#FFF6EC"/>
+    <rect width="1280" height="360" filter="url(#grain)"/>
+    <!-- top-right shapes (same as the form pages) -->
+    <g transform="translate(760 0)">
+      <path d="M520 0H120c-18 64 22 130 104 150 86 21 118 96 196 150 40 28 76 38 100 40z" fill="#FFE2C2"/>
+      <path d="M520 0H286c-14 58 18 112 92 128 62 13 104 50 142 96z" fill="#0F766E"/>
+      <circle cx="300" cy="64" r="44" fill="#FF8B5A"/>
+      <path d="M520 236c-34-6-64 4-82 30 30 6 58 22 82 46z" fill="#6B8F7A" opacity=".75"/>
+    </g>
+    <!-- bottom-left shapes -->
+    <g transform="translate(0 150) scale(.52)">
+      <path d="M0 400V96c74 6 124 60 150 128 22 58 74 118 168 176z" fill="#FFE2C2"/>
+      <path d="M0 400V214c58 2 98 46 116 104 10 34 28 62 56 82z" fill="#6B8F7A" opacity=".85"/>
+      <circle cx="212" cy="352" r="26" fill="#FF8B5A"/>
+    </g>
+    <!-- logo -->
+    <g transform="translate(96 74) scale(1.6)">
+      <rect width="40" height="40" rx="11" fill="#0F766E"/>
+      <path d="M9 30c0-10 7.5-17.5 18.5-18.5C26.5 22.5 19 30 9 30z" fill="#FFE2C2"/>
+      <path d="M9.5 29.5 21 18" stroke="#0F766E" stroke-width="1.6" stroke-linecap="round"/>
+      <circle cx="29" cy="11" r="5" fill="#FF8B5A"/>
+    </g>
+    <text x="176" y="118" font-family="Figtree, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="22" font-weight="700" fill="#0F172A">Demo Family Clinic</text>
+    <text x="96" y="196" font-family="Figtree, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="50" font-weight="800" fill="#0F766E" letter-spacing="-1">Appointment booking, end to end</text>
+    <text x="96" y="240" font-family="Figtree, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="22" fill="#0F172A">Online booking · cancel links · morning reminders · doctors' daily lists</text>
+    <!-- chips -->
+    <g font-family="Figtree, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="16" font-weight="700">
+      <rect x="96" y="272" width="104" height="34" rx="17" fill="#0F766E"/><text x="148" y="294" text-anchor="middle" fill="#FFFFFF">n8n</text>
+      <rect x="212" y="272" width="168" height="34" rx="17" fill="#FF8B5A"/><text x="296" y="294" text-anchor="middle" fill="#0F172A">Google Sheets</text>
+      <rect x="392" y="272" width="104" height="34" rx="17" fill="#FFE2C2"/><text x="444" y="294" text-anchor="middle" fill="#0F172A">Gmail</text>
+      <rect x="508" y="272" width="148" height="34" rx="17" fill="#FFFFFF" stroke="#E8D9C6"/><text x="582" y="294" text-anchor="middle" fill="#0F172A">6 workflows</text>
+    </g>
+  </g>
+</svg>

@@ -1,0 +1,189 @@
+{
+  "name": "d4. clinic-doctor-list",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 8 * * 1-6"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.3,
+      "position": [
+        0,
+        0
+      ],
+      "id": "8b6d25ad-4e2a-4860-a2ab-66e49f71b144",
+      "name": "Every Morning 8 AM"
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        -180
+      ],
+      "id": "369d2ddc-cd6e-440e-a0a4-09b8a320b231",
+      "name": "Run Now"
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "PICK_D0_CLINIC_CORE",
+          "mode": "list"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "action": "schedule",
+            "data": "={{ {} }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "action",
+              "displayName": "action",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string"
+            },
+            {
+              "id": "data",
+              "displayName": "data",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "object"
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.2,
+      "position": [
+        220,
+        -90
+      ],
+      "id": "15f8d9d5-cc31-4ca1-a6c7-06d6641e35ea",
+      "name": "Doctor Lists"
+    },
+    {
+      "parameters": {
+        "fromEmail": "={{ $json.email.from }}",
+        "toEmail": "={{ $json.email.to }}",
+        "subject": "={{ $json.email.subject }}",
+        "emailFormat": "both",
+        "text": "={{ $json.email.text }}",
+        "html": "={{ $json.email.html }}",
+        "options": {
+          "appendAttribution": false
+        }
+      },
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "position": [
+        440,
+        -90
+      ],
+      "id": "4ccb13c5-5663-4d3a-a227-de75a2044a77",
+      "name": "Send Emails",
+      "webhookId": "248f868b-004e-41df-a85d-6e6929467d49",
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Check Sends: after every email has been tried, fail loudly if any didn't go out, so e0 emails you.\n// Sits on its own branch BELOW the other one: n8n runs the top branch first, so stamps are saved before this runs.\nconst failMsg = j => j.error ? String(j.error.message || j.error.description || j.error) : (Array.isArray(j.rejected) && j.rejected.length ? 'rejected by the mail server: ' + j.rejected.join(', ') : '');\nconst ANSWERS = 'Doctor Lists';                                 // the node whose items were emailed\nconst answers = $(ANSWERS).all();\nconst sends = $('Send Emails').all();\n\nconst failed = [];\nsends.forEach((s, i) => {\n  const err = failMsg(s.json);\n  if (!err) return;\n  const a = answers[i].json;\n  const who = a.kind === 'attention' ? 'the \"Needs attention\" email' : a.kind === 'doctor' ? `${a.doctor}'s list` : `${a.patient_name} (${a.booking_id})`;\n  failed.push(`${who}: ${err}`);\n});\nif (failed.length) {\n  throw new Error(`${failed.length} of ${sends.length} emails failed to send. ${failed.join(' | ')}`);\n}\nreturn [{ json: { sent: sends.length } }];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        660,
+        -90
+      ],
+      "id": "e4c7beed-3ed0-4912-a882-54011abec731",
+      "name": "Check Sends"
+    },
+    {
+      "parameters": {
+        "content": "## d4 · Doctors' Morning Lists\nMonday to Saturday at 8 AM (Pakistan time): each doctor gets today's confirmed appointments (time, patient, visit, phone), sorted by time. A doctor with none gets an email saying so; a doctor marked away in Closures but with bookings is flagged.\n\nd0 also checks the whole sheet every morning: unreadable dates or times, unknown doctors, duplicate booking IDs, bad Closures rows. Any found go to you in one \"Needs attention\" email.\n\nIf any email fails, Check Sends stops the run with the names and e0 emails you. To test, set data in Doctor Lists to {{ { test_now: '2026-10-19 08:00' } }}.",
+        "width": 900,
+        "height": 300,
+        "color": 2
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -20,
+        -560
+      ],
+      "id": "2ab94690-0477-4dba-ac00-91b81968892d",
+      "name": "Note: Overview"
+    }
+  ],
+  "connections": {
+    "Every Morning 8 AM": {
+      "main": [
+        [
+          {
+            "node": "Doctor Lists",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Run Now": {
+      "main": [
+        [
+          {
+            "node": "Doctor Lists",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Doctor Lists": {
+      "main": [
+        [
+          {
+            "node": "Send Emails",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Emails": {
+      "main": [
+        [
+          {
+            "node": "Check Sends",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "timezone": "Asia/Karachi",
+    "callerPolicy": "workflowsFromSameOwner"
+  },
+  "tags": []
+}

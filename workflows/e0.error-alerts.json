@@ -1,0 +1,98 @@
+{
+  "name": "e0. error-alerts",
+  "nodes": [
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.errorTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        0
+      ],
+      "id": "92f08e52-dfa2-428c-8429-49f922a66b69",
+      "name": "Error Trigger"
+    },
+    {
+      "parameters": {
+        "content": "### e0 · Error Alerts\n\nShared error workflow for every project (Amazon Toolkit i1–i5, c1; Demo Clinic d0–d4). When a production run fails, it emails the workflow name, the node that failed, the error message and a link to the execution.\n\nEach workflow points here in Settings → Error Workflow. Runs started from the editor don't trigger it.",
+        "height": 258,
+        "width": 460,
+        "color": 2
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        32,
+        -320
+      ],
+      "id": "62ed3fcd-f81d-456f-a07e-39fe7226769d",
+      "name": "Note: Overview"
+    },
+    {
+      "parameters": {
+        "fromEmail": "you@example.com",
+        "toEmail": "you@example.com",
+        "subject": "={{ $json.subject }}",
+        "html": "={{ $json.html }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "position": [
+        432,
+        0
+      ],
+      "id": "ffde6d5c-beba-4c33-a37b-bd2ebb33ba32",
+      "name": "Send an Email",
+      "webhookId": "ce3590dd-7095-43bb-bf31-928b4cf16ddf"
+    },
+    {
+      "parameters": {
+        "jsCode": "// e0 Error Alerts: builds the alert email (email-safe: tables + inline styles). Reads only the Error Trigger's data.\nconst d = $('Error Trigger').first().json;\nconst wf = d.workflow || {};\nconst ex = d.execution || {};\nconst trig = d.trigger || {};\nconst err = ex.error || trig.error || {};\nconst name = wf.name || 'Unknown workflow';\nconst node = ex.lastNodeExecuted || (err.node && err.node.name) || (trig.error ? 'trigger' : 'unknown');\nconst message = String(err.message || err.description || 'No error message was passed on.').trim();\nconst esc = t => String(t ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');\nconst when = $now.setZone('Asia/Karachi').toFormat('dd LLL yyyy, HH:mm') + ' PKT';\n\n// Tool colour from the workflow name (\"i4. market-autopilot\" -> i4)\nconst TOOL = { i1: ['#1B3A6B', 'Market Screener'], i2: ['#0F3D3E', 'Market Deep Dive'], i3: ['#8B4E34', 'Competitor Targeting'], i4: ['#4A1F3D', 'Market Autopilot'], i5: ['#214235', 'Next Keywords'], c1: ['#0D1B2A', 'Toolkit Core'],\n  d0: ['#0F766E', 'Clinic Core'], d1: ['#0F766E', 'Clinic Booking'], d2: ['#0F766E', 'Clinic Cancel'], d3: ['#0F766E', 'Clinic Reminders'], d4: ['#0F766E', 'Doctor Lists'] };\nconst code = (String(name).match(/^\\s*([icd]\\d)\\b/i) || [])[1]?.toLowerCase();\nconst [toolColour, toolName] = TOOL[code] || ['#0D1B2A', ''];\n\n// What to check first, matched on the error text. First match wins; a general fallback otherwise.\nconst HINTS = [\n  [/emails? failed to send/i, 'Some emails did not go out. The error names who and why; usually a mistyped address in the sheet. Everyone else was sent. Failed reminders retry next morning by themselves.'],\n  [/Forbidden - perhaps check your credentials|caller does not have permission|PERMISSION_DENIED|Requested entity was not found/i, 'Google refused access. Clinic (service account): share the sheet with the service account email as Editor and check that the Google Sheets API is enabled in its Cloud project; a fresh share can take a few minutes. Amazon tools (OAuth): n8n → Credentials → Reconnect.'],\n  [/not in CLINIC\\.(doctors|visitTypes)/i, 'A form dropdown and the CLINIC block in d0 · Clinic Rules do not match. Make the option text identical in both.'],\n  [/test_now must look like/i, 'A test date was left in a workflow. Set the data field back to {{ {} }}.'],\n    [/invalid_grant|unauthori[sz]ed|\\b40[13]\\b|token (has )?(been )?expired|expired token|re-?auth|credentials? (are|is|was) (invalid|expired)|reconnect/i, 'Google sign-in has probably expired (Testing-mode OAuth lasts about a week). n8n → Credentials → open the Google Sheets or Gmail credential → Reconnect, then run again.'],\n  [/run out of searches|searches.*(left|limit)|429|too many requests|upgrade your (plan|account)/i, 'SerpApi monthly searches may be used up. Check the SerpApi dashboard; the free tier resets monthly.'],\n  [/only \\d+ usable listings|no usable listings/i, 'The keyword returned too few real products. The error names the word to drop; try the keyword without it.'],\n  [/no (seed )?keywords? entered|no seed keyword/i, 'The form was sent without a keyword. Nothing to fix in the workflow.'],\n  [/all \\d+ keywords failed/i, 'Every search failed. Check the SerpApi key and searches left, then the keywords themselves.'],\n  [/ECONN|ETIMEDOUT|ENOTFOUND|socket|network|timeout/i, 'A network call timed out. Usually temporary: check the internet connection and run again.'],\n  [/sheet|range|column/i, 'Google Sheets rejected the write. If a header was renamed or added, open the Sheets node → Columns → Refresh, then Save → Publish.'],\n];\nconst hint = (HINTS.find(([re]) => re.test(message)) || [null, 'Open the execution, click the red node, and read its input and output.'])[1];\n\nconst FONT = 'font-family:Segoe UI,Helvetica,Arial,sans-serif';\nconst row = (k, v) => `<tr><td width=\"150\" valign=\"top\" style=\"padding:9px 0;border-bottom:1px solid #f0ece5;${FONT};font-size:13px;color:#5f6670\">${esc(k)}</td><td valign=\"top\" style=\"padding:9px 0;border-bottom:1px solid #f0ece5;${FONT};font-size:14px;color:#1f2328\">${v}</td></tr>`;\nconst button = ex.url ? `<tr><td style=\"padding:4px 28px 24px\"><a href=\"${esc(ex.url)}\" style=\"display:inline-block;background:${toolColour};color:#ffffff;text-decoration:none;${FONT};font-size:14px;font-weight:bold;padding:11px 20px;border-radius:4px\">Open the failed execution</a></td></tr>` : '';\n\nconst html = `<!doctype html><html><body style=\"margin:0;padding:0;background:#f4f1ec\">\n<table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" style=\"background:#f4f1ec\"><tr><td align=\"center\" style=\"padding:24px 12px\">\n<table role=\"presentation\" width=\"600\" cellpadding=\"0\" cellspacing=\"0\" style=\"width:600px;max-width:100%;background:#ffffff;border:1px solid #e2ddd5\">\n<tr><td style=\"background:#DC143C;height:6px;line-height:6px;font-size:0\">&nbsp;</td></tr>\n<tr><td style=\"background:${toolColour};padding:22px 28px 18px;border-bottom:4px solid #9C7A3C\">\n  <div style=\"font-family:Consolas,monospace;font-size:12px;letter-spacing:3px;color:#D8CBB8\">E0 · ERROR ALERT${toolName ? ` · ${esc(code)} ${esc(toolName.toUpperCase())}` : ''}</div>\n  <div style=\"font-family:Georgia,'Times New Roman',serif;font-size:26px;color:#ffffff;margin-top:10px\">A run failed</div>\n  <div style=\"${FONT};font-size:13px;color:#D8CBB8;margin-top:6px\">${esc(name)} &nbsp;·&nbsp; ${esc(when)}</div>\n</td></tr>\n<tr><td style=\"padding:22px 28px 6px\">\n  <div style=\"${FONT};font-size:12px;letter-spacing:2px;text-transform:uppercase;color:#DC143C;font-weight:bold\">Error</div>\n  <div style=\"margin-top:8px;padding:12px 14px;background:#fdf1f3;border-left:4px solid #DC143C;font-family:Consolas,monospace;font-size:13px;line-height:1.5;color:#1f2328;word-break:break-word\">${esc(message)}</div>\n</td></tr>\n<tr><td style=\"padding:14px 28px 6px\"><table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\">\n  ${row('Workflow', `<b>${esc(name)}</b>`)}\n  ${row('Failed at node', `<b>${esc(node)}</b>`)}\n  ${row('Execution', esc(ex.id || '–'))}\n  ${row('Mode', esc(ex.mode || trig.mode || '–'))}\n</table></td></tr>\n<tr><td style=\"padding:14px 28px 18px\">\n  <div style=\"padding:12px 14px;background:#f7f5f2;border:1px solid #e2ddd5;border-radius:4px;${FONT};font-size:13px;line-height:1.5;color:#3d434a\"><b style=\"color:${toolColour}\">Check first:</b> ${esc(hint)}</div>\n</td></tr>\n${button}\n<tr><td style=\"padding:12px 28px;background:#fbfaf7;border-top:1px solid #eee7dc;${FONT};font-size:12px;color:#5f6670\">Sent by e0 · error-alerts. Runs started from the editor don't send alerts.</td></tr>\n</table></td></tr></table></body></html>`;\n\nconst subject = `⚠ n8n failed: ${name} · ${node}`;\nreturn [{ json: { subject, html } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        224,
+        0
+      ],
+      "id": "ed3ccd86-65e9-486e-98f1-131060ec83b1",
+      "name": "Build Alert"
+    }
+  ],
+  "connections": {
+    "Error Trigger": {
+      "main": [
+        [
+          {
+            "node": "Build Alert",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Alert": {
+      "main": [
+        [
+          {
+            "node": "Send an Email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false
+  },
+  "meta": {
+    "templateCredsSetupCompleted": true
+  },
+  "nodeGroups": [],
+  "tags": []
+}
