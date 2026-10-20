@@ -10,7 +10,7 @@
 
 # Demo Family Clinic: appointment booking in n8n
 
-A complete booking system for a small two-doctor clinic, built from six n8n workflows and one Google Sheet, plus **Sera**, an AI front desk that chats with patients and books through the same rules ([jump to it](#front-desk-chat-sera)). Patients book and cancel online, get a confirmation and a reminder by email, and each doctor gets their day's list every morning. The clinic and everyone in it are fictional.
+A complete booking system for a small two-doctor clinic, built in n8n on one Google Sheet. Patients book through a **form** or through **Sera**, the clinic's AI front desk, who chats in English, Urdu and Roman Urdu and books through exactly the same rules ([jump to Sera](#front-desk-chat-sera)). Patients book and cancel online, get a confirmation and a reminder by email, and each doctor gets their day's list every morning. The clinic and everyone in it are fictional.
 
 **Contents:** [What it does](#what-it-does) · [What it replaces](#what-it-replaces) · [How it works](#how-it-works) · [What it handles](#what-it-handles) · [How it was tested](#how-it-was-tested) · [Sample output](#sample-output) · [Setup](#setup) · [Known limitations](#known-limitations) · [Front desk chat: Sera](#front-desk-chat-sera)
 
@@ -18,11 +18,12 @@ A complete booking system for a small two-doctor clinic, built from six n8n work
 
 | | For the patient | For the clinic |
 |---|---|---|
-| **Booking** | A two-page form: details and a preferred day, then only the times that are still free. | A row in **Appointments** and one in **Request Log** for every attempt, booked or not. |
+| **Booking** | A two-page form: details and a preferred day, then only the times that are still free. Or a chat with **Sera**: "kal shaam Dr. Usman free hain?" → times as buttons → booked. | A row in **Appointments** and one in **Request Log** for every attempt, booked or not. |
 | **Confirmation** | An email with the time, doctor and token, an *Add to Google Calendar* button and a cancel link. | Nothing to do. |
 | **Cancelling** | One click from the email, with a confirm step. Open until 2 hours before. | The time frees itself; the row turns grey with a timestamp. |
 | **Reminders** | One email at 8 AM the day before (or on the morning of the visit, if they booked after that day's run). | The reminder column says *Sent* or *Failed* with the reason. Failed ones retry next morning. |
 | **Doctors' lists** | — | Monday to Saturday at 8 AM, each doctor gets today's appointments sorted by time. |
+| **Questions** | Sera answers hours and doctors, refuses medical advice, sends emergencies to 1122, and passes anything else to reception with a reference. | An email and a **Handoffs** row for every question Sera passes on. |
 | **Problems** | — | One *Needs attention* email naming the exact row: unreadable dates, unknown doctors, duplicate IDs, and any booking that falls on a day its doctor is away. |
 
 Staff work in the sheet: an **Upcoming** board, the **Appointments** list, **Closures** (days off, with a date picker) and the **Request Log**.
@@ -37,31 +38,35 @@ Staff work in the sheet: an **Upcoming** board, the **Appointments** list, **Clo
 ## How it works
 
 ```mermaid
-%%{init: {'theme':'base','themeVariables':{'primaryColor':'#FFE2C2','primaryTextColor':'#0F172A','primaryBorderColor':'#0F766E','lineColor':'#0F766E','clusterBkg':'#FFF6EC','clusterBorder':'#E8D9C6','edgeLabelBackground':'#FFFFFF'}}}%%
 flowchart TB
-  P([Patient]) --> D1 & D2
-  C([8 AM schedule]) --> D3 & D4
-  subgraph W [" "]
+  P(["Patient"]) --> D1 & D2 & F0
+  C(["8 AM schedule"]) --> D3 & D4
+  subgraph W [Workflows]
     direction LR
-    D1[d1 · booking]
-    D2[d2 · cancel]
-    D3[d3 · reminders]
-    D4[d4 · doctors' lists]
+    D1["d1 · booking form"]
+    D2["d2 · cancel"]
+    D3["d3 · reminders"]
+    D4["d4 · doctors' lists"]
+    F0["f0 · Sera, the chat"]
   end
-  W -->|"action + data"| D0{{"d0 · clinic-core<br/>rules, pages, emails"}}
-  D0 -->|reads| S[(Google Sheet)]
+  F0 -->|"her tools"| T["f1 find times · f2 book · f3 hand off"]
+  W -->|"action + data"| D0{{"d0 · clinic-core: rules, pages, emails"}}
+  T --> D0
+  D0 -->|"reads"| S[("Google Sheet")]
   W -->|"save rows"| S
-  W -->|send| M[/Gmail SMTP/]
-  W -. "any failure" .-> E0[e0 · error-alerts]
+  W -->|"send"| M[/"Gmail SMTP"/]
+  W -.->|"any failure"| E0["e0 · error-alerts"]
   classDef core fill:#0F766E,color:#FFFFFF,stroke:#0F766E;
+  classDef sera fill:#FFE2C2,color:#0F172A,stroke:#FF8B5A;
   classDef ext fill:#FF8B5A,color:#0F172A,stroke:#FF8B5A;
   classDef err fill:#FFFFFF,color:#B42318,stroke:#B42318;
   class D0 core
+  class F0,T sera
   class S,M ext
   class E0 err
 ```
 
-**d0 · clinic-core** is the only place the clinic's rules and look live. The other workflows call it with an *action* (`slots`, `check`, `booking`, `reminders`, `schedule`) and get back a decision with its page or email already built. Hours, slot length, days off, doctors, booking window and notice times are one `CLINIC` block at the top of its Rules node. d0 only reads the sheet; the callers do the writing.
+**d0 · clinic-core** is the only place the clinic's rules and look live. The form (d1) and Sera (f0–f3) both book through it, so they can never disagree about a time. The other workflows call it with an *action* (`slots`, `check`, `booking`, `reminders`, `schedule`) and get back a decision with its page or email already built. Hours, slot length, days off, doctors, booking window and notice times are one `CLINIC` block at the top of its Rules node. d0 only reads the sheet; the callers do the writing.
 
 | Workflow | Trigger | Stages |
 |---|---|---|
@@ -233,6 +238,17 @@ Beside the chat, a **Behind the desk** panel prints every step the automation ta
 
 A booking lands in the chat as a **token slip** with *Add to calendar* and *Cancel booking*, and the patient gets the same confirmation email as a form booking.
 
+### Sera in action
+
+From the live test on 20 October 2026 (Groq model, real Google Sheet and Gmail):
+
+| | |
+|---|---|
+| ![Sera finds free times; the receipt roll shows each step](docs/screenshots/sera-chat.png) | ![A booking in Roman Urdu ends in a token slip](docs/screenshots/sera-token.png) |
+| *After hours: free times as buttons, every step printed on the roll* | *Booked in Roman Urdu: token slip, calendar and cancel buttons* |
+| ![A question in Urdu script, answered in Urdu script](docs/screenshots/sera-urdu.png) | ![A request for a person becomes a hand-off with a reference](docs/screenshots/sera-handoff.png) |
+| *Urdu script in, Urdu script out* | *"I want to talk to a person": reception emailed, Handoffs row, reference HO-JGQKW* |
+
 ### What it replaces
 
 - **Answering "are you open, is the doctor free?" by phone** all day, including after hours. The page greets night visitors with "the clinic's closed, but I'm not" and still books them.
@@ -242,19 +258,20 @@ A booking lands in the chat as a **token slip** with *Add to calendar* and *Canc
 ### How Sera works
 
 ```mermaid
-%%{init: {'theme':'base','themeVariables':{'primaryColor':'#FFE2C2','primaryTextColor':'#0F172A','primaryBorderColor':'#0F766E','lineColor':'#0F766E','clusterBkg':'#FFF6EC','clusterBorder':'#E8D9C6'}}}%%
 flowchart LR
-  P([Patient]) -->|message| F0[f0 · front-desk]
-  F0 --> PR{Prep}
-  PR -->|emergency| R[Reply]
-  PR -->|chat| N((Sera · Groq))
-  N --> T1[f1 · find times] & T2[f2 · book] & T3[f3 · hand off]
-  T1 & T2 & T3 --> D0{{d0 · clinic-core}}
+  P(["Patient"]) -->|"message"| F0["f0 · front-desk"]
+  F0 --> PR{"Prep"}
+  PR -->|"emergency"| R["Reply"]
+  PR -->|"chat"| N(("Sera · Groq"))
+  N --> T1["f1 · find times"] & T2["f2 · book"] & T3["f3 · hand off"]
+  T1 & T2 & T3 --> D0{{"d0 · clinic-core"}}
   N --> R --> P
-  T2 -->|save, email, log| S[(Sheet)]
-  T3 -->|email + Handoffs| S
+  T2 -->|"save, email, log"| S[("Sheet")]
+  T3 -->|"email + Handoffs"| S
   classDef core fill:#0F766E,color:#FFFFFF,stroke:#0F766E;
+  classDef sera fill:#FFE2C2,color:#0F172A,stroke:#FF8B5A;
   class D0 core
+  class N sera
 ```
 
 | Workflow | Trigger | What it does |
