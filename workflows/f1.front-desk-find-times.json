@@ -1,0 +1,137 @@
+{
+  "name": "f1. front-desk-find-times",
+  "nodes": [
+    {
+      "parameters": {
+        "content": "## f1 · Find times (Sera's tool)\nSera calls this before naming any time. It asks **d0** (`availability`), the same rules as the booking form, so the chat can't offer a closed day or a taken time.\n\nIf the asked day has no times, d0 moves to the next day that has some and says why. Bad dates, unknown doctors and dates past the 30-day window come back as a plain status, never an error.",
+        "height": 210,
+        "width": 620
+      },
+      "id": "b8ee4e18-9223-47b5-881d-5017615b6e89",
+      "name": "Note: f1",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -40,
+        -240
+      ]
+    },
+    {
+      "parameters": {
+        "inputSource": "workflowInputs",
+        "workflowInputs": {
+          "values": [
+            {
+              "name": "doctor",
+              "type": "string"
+            },
+            {
+              "name": "date",
+              "type": "string"
+            }
+          ]
+        }
+      },
+      "id": "c9bee963-2c9a-4385-a9b5-5eee9f3e8640",
+      "name": "Start",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        0,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "PICK_D0_CLINIC_CORE",
+          "mode": "id"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "action": "availability",
+            "data": "={{ { doctor: $json.doctor, date: $json.date } }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "action",
+              "displayName": "action",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string"
+            },
+            {
+              "id": "data",
+              "displayName": "data",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "object"
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "options": {}
+      },
+      "id": "0790d1d8-536c-4299-9b23-0a20e8ab34d7",
+      "name": "Ask d0",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.2,
+      "position": [
+        220,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// f1 · Answer: turns d0's availability answer into a short reply for Sera, plus trace lines for the page's side panel.\nconst a = $input.first().json;\nconst out = { kind: 'find_times', status: a.status };\nconst trace = [];\nif (a.status === 'ok') {\n  out.results = a.results.map(r => ({ doctor: r.doctor, date: r.date, date_label: r.date_label, note: r.note, free_times: r.times }));\n  for (const r of a.results) {\n    if (!r.times.length) trace.push({ icon: 'search', text: `${r.doctor}: no free times in the next 30 days` });\n    else trace.push({ icon: 'search', text: `Free times for ${r.doctor}, ${r.date_label}: ${r.times.length}` + (r.moved ? ` (asked day had none: ${r.note.split('.')[0].toLowerCase()})` : '') });\n  }\n} else if (a.status === 'bad_date') {\n  out.message = `The date \"${a.asked_date}\" can't be read. Send it as YYYY-MM-DD, using the 14-day list.`;\n  trace.push({ icon: 'skip', text: `Unreadable date \"${a.asked_date}\": asked Sera to resend it` });\n} else if (a.status === 'too_far') {\n  out.message = `Online booking only goes up to ${a.last_day_label} (${a.last_day}).`;\n  trace.push({ icon: 'skip', text: `Date beyond the 30-day booking window` });\n} else if (a.status === 'unknown_doctor') {\n  out.message = `There is no doctor called \"${a.asked_doctor}\". The doctors are ${a.doctors.join(' and ')}.`;\n  trace.push({ icon: 'skip', text: `Unknown doctor \"${a.asked_doctor}\"` });\n}\nout._trace = trace;\nreturn [{ json: out }];\n"
+      },
+      "id": "5a0d1f4a-a942-42c8-bf82-fcb47c03c0af",
+      "name": "Answer",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        440,
+        0
+      ]
+    }
+  ],
+  "connections": {
+    "Start": {
+      "main": [
+        [
+          {
+            "node": "Ask d0",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ask d0": {
+      "main": [
+        [
+          {
+            "node": "Answer",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "timezone": "Asia/Karachi",
+    "callerPolicy": "workflowsFromSameOwner"
+  },
+  "tags": []
+}

@@ -10,6 +10,11 @@ Node by node, in the order each workflow runs. The sticky notes on the n8n canva
 | `d3.clinic-reminders.json` | [d3 · clinic-reminders](#d3--clinic-reminders) | 7 + 2 notes |
 | `d4.clinic-doctor-list.json` | [d4 · clinic-doctor-list](#d4--clinic-doctor-list) | 5 + 1 note |
 | `e0.error-alerts.json` | [e0 · error-alerts](#e0--error-alerts) | 3 + 1 note |
+| `f0.front-desk.json` | [f0 · front-desk](#f0--front-desk) | 17 + 2 notes |
+| `f1.front-desk-find-times.json` | [f1 · find-times](#f1--find-times) | 3 + 1 note |
+| `f2.front-desk-book.json` | [f2 · book](#f2--book) | 14 + 1 note |
+| `f3.front-desk-hand-off.json` | [f3 · hand-off](#f3--hand-off) | 7 + 1 note |
+| `r0.sera-red-team.json` | [r0 · sera-red-team](#r0--sera-red-team) | 9 + 1 note |
 
 ---
 
@@ -32,6 +37,8 @@ The clinic's rules, pages and emails, in one place. Called by d1–d4; never run
 | `slots` | d1 › Find Times | `choose` (free times + the Choose Time page) or `refused` (invalid details, too far ahead, no free time + its page) |
 | `check` | d1 › Final Check | `book` (the row to save, confirmation email, booked page, when the reminder will arrive) or `stop` (taken, too late, closed, declined, abandoned + its page) |
 | `booking` | d2 › Find Booking, Check Again | `cancellable` (confirm form, the update to write, cancellation email, pages) or `not_found` / `already_cancelled` / `too_late` / `passed` |
+| `info` | f0 › Clinic Info, f3 › Clinic Info | Open now or not, closing time or next opening, the next 14 days with closures marked, doctors, visit types |
+| `availability` | f1 › Ask d0, f2 › Check Time | Free times for one doctor or all, or the next day with times and why. Bad input comes back as `bad_date` / `too_far` / `unknown_doctor`, never an error |
 | `reminders` | d3 › Due Reminders | One item per reminder due, plus one *Needs attention* item listing upcoming clashes and rows that can't be reminded |
 | `schedule` | d4 › Doctor Lists | One item per doctor with today's list, plus one *Needs attention* item for anything in the sheet it can't read |
 
@@ -105,3 +112,81 @@ The clinic's rules, pages and emails, in one place. Called by d1–d4; never run
 | 1 | **Error Trigger** | Error Trigger | Fires when a production run of any workflow pointing here fails. Runs started from the editor don't trigger it. |
 | 2 | **Build Alert** | Code · [`e0-build-alert.js`](../code/e0-build-alert.js) | Workflow, failed node, error message, execution link, and a *Check first* hint matched on the error text (failed emails, Google access, dropdown mismatch, a test date left in, network). Colour-coded per project. Shared with my Amazon Toolkit workflows, so it also carries their labels and hints. |
 | 3 | **Send an Email** | Send Email (SMTP) | To you. |
+
+---
+
+## f0 · front-desk
+
+| # | Node | Type | What it does |
+|---|---|---|---|
+| 1 | **Open Page** | Webhook (GET) | `/webhook/front-desk`. |
+| 2 | **Page** | Code · [`f0-page.js`](../code/f0-page.js) | The chat page. Works out the chat address from the request's host, because n8n serves webhook pages in a sandbox. |
+| 3 | **Send Page** | Respond to Webhook | Sends it as HTML. |
+| 4 | **Chat In** | Webhook (POST) | `/webhook/front-desk/chat`: `{ sessionId, message }` or `{ sessionId, hello: true }`, as text/plain. |
+| 5 | **Clinic Info** | Execute Workflow → d0 `info` | Today's facts. |
+| 6 | **Prep** | Code · [`f0-prep.js`](../code/f0-prep.js) | Reads the message, picks the route (hello, empty, emergency, agent), writes Sera's briefing with the 14-day calendar. |
+| 7 | **Ask Sera?** | If | Only the `agent` route reaches the AI. |
+| 8 | **Sera** | AI Agent | Groq, chat memory per session, three tools, max 6 steps, returns its tool steps. On error, the error output goes to Reply. |
+| 9 | **Chat Model** | Groq Chat Model | `openai/gpt-oss-120b`, temperature 0.4, max 600 tokens. Swap for any chat model that can call tools. |
+| 9b | **Fallback Model** | Groq Chat Model | `qwen/qwen3.8-27b`, used when Chat Model fails or is out of free tokens. Its own daily allowance. |
+| 10 | **Chat Memory** | Simple Memory | Last 6 messages (kept short to save tokens), keyed on the page's session ID. |
+| 11 | **find_times** · **book_appointment** · **hand_off** | Call n8n Workflow Tool | f1, f2, f3. Their inputs are filled by the model (`$fromAI`). |
+| 12 | **Reply** | Code · [`f0-reply.js`](../code/f0-reply.js) | The reply, the panel steps, time buttons (times Sera names first, then a spread across the day), the token slip, the hand-off reference, and the log row. |
+| 13 | **Answer** | Respond to Webhook | JSON with `Access-Control-Allow-Origin: *` (the sandboxed page has no origin of its own). |
+| 14 | **Worth Logging?** | If | Skips page-open greetings. |
+| 15 | **Log Chat** | Google Sheets | Appends to Front Desk Log, RAW. Continues on error, so a sheet problem never blocks a reply. |
+
+## f1 · find-times
+
+| # | Node | Type | What it does |
+|---|---|---|---|
+| 1 | **Start** | Execute Workflow Trigger | `doctor`, `date`. |
+| 2 | **Ask d0** | Execute Workflow → d0 `availability` | |
+| 3 | **Answer** | Code · [`f1-answer.js`](../code/f1-answer.js) | A short answer for Sera (no pages or emails in it) and the panel lines. |
+
+## f2 · book
+
+| # | Node | Type | What it does |
+|---|---|---|---|
+| 1 | **Start** | Execute Workflow Trigger | `patient_name`, `phone`, `email`, `doctor`, `visit_type`, `date`, `time`. |
+| 2 | **Check Time** | Execute Workflow → d0 `availability` | Is that exact time free on that exact day? |
+| 3 | **Shape** | Code · [`f2-shape.js`](../code/f2-shape.js) | Everything present, one doctor, no silent move to another day, a readable free time, a real visit type. Builds the form-shaped data d0 `slots` expects. |
+| 4 | **Ready?** | If | No → Result, nothing written. |
+| 5 | **Find Times** | Execute Workflow → d0 `slots` | Validates name, mobile and email exactly like page 1 of the form. |
+| 6 | **Can Book?** | If | Details accepted, same day, time still listed. |
+| 7 | **Make Cancel Token** | Crypto | UUID for the cancel link. |
+| 8 | **Final Check** | Execute Workflow → d0 `check` | The last-second re-check, as in d1. |
+| 9 | **Book It?** | If | |
+| 10 | **Save Appointment** · **Send Confirmation** | Google Sheets · Send Email | Same nodes and settings as d1. |
+| 11 | **Finish** | Code · [`f2-finish.js`](../code/f2-finish.js) | Request Log row, reason "Booked in the website chat (Sera)". |
+| 12 | **Log Request** | Google Sheets | Append-or-update on `booking_id`. |
+| 13 | **Result** | Code · [`f2-result.js`](../code/f2-result.js) | `booked` with the ticket, or `not_booked` with the reason and alternatives; panel lines either way. |
+
+## f3 · hand-off
+
+| # | Node | Type | What it does |
+|---|---|---|---|
+| 1 | **Start** | Execute Workflow Trigger | `patient_name`, `contact`, `reason`, `summary`. |
+| 2 | **Clinic Info** | Execute Workflow → d0 `info` | Reception's address and the clinic's from-address. |
+| 3 | **Build** | Code · [`f3-build.js`](../code/f3-build.js) | HO reference, escaped email, sheet row. No contact → not sent. |
+| 4 | **Ready?** | If | |
+| 5 | **Send to Reception** | Send Email (SMTP) | Continues on error. |
+| 6 | **Save Handoff** | Google Sheets | Appends to Handoffs, RAW, status Open. Continues on error. |
+| 7 | **Result** | Code · [`f3-result.js`](../code/f3-result.js) | `handed_off` with the reference, or `not_sent`. |
+
+## r0 · sera-red-team
+
+Start it with **Execute workflow** in the editor only (see the note on the canvas).
+
+| # | Node | Type | What it does |
+|---|---|---|---|
+| 1 | **Run Red Team** | Manual Trigger | |
+| 2 | **Settings** | Code · [`r0-settings.js`](../code/r0-settings.js) | Chat address, pause between messages, test phone and email, report address, optional script filter. |
+| 3 | **Attack Scripts** | Code · [`r0-scripts.js`](../code/r0-scripts.js) | The 45 conversations, each with its category, severity and checks. |
+| 4 | **One at a Time** | Loop Over Items | One script per pass, so no Code node runs near n8n's time limit. |
+| 5 | **Play & Grade** | Code · [`r0-play.js`](../code/r0-play.js) | Plays the conversation through Sera's chat webhook (with pauses for the AI provider's per-minute limit), then grades every reply. |
+| 6 | **Report** | Code · [`r0-report.js`](../code/r0-report.js) | Pass rates by category and severity, the failures, any test bookings, the summary email. |
+| 7 | **Summary?** | If | The summary goes to email, the rows go to the sheet. |
+| 8 | **Email Report** | Send Email (SMTP) | Continues on error. |
+| 9 | **Save Results** | Google Sheets | Appends to Red Team, RAW. Continues on error. |
+

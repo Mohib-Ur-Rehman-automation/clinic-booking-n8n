@@ -14,6 +14,7 @@ const CLINIC = {
   minNoticeMinutes: 60,          // online booking closes this long before a slot
   cancelCutoffMinutes: 120,      // online cancelling closes this long before a slot
   reminderHour: 8,               // d3 sends reminders at this hour; keep it the same as d3's "Every Morning 8 AM" trigger
+  maxUpcomingPerPatient: 2,      // the website chat books at most this many upcoming visits per person (mobile number + name)
   bookingFormUrl: 'http://localhost:5678/form/clinic-booking',
   cancelFormUrl: 'http://localhost:5678/form/clinic-cancel',
   fromEmail: 'Demo Family Clinic <you@example.com>',
@@ -360,4 +361,76 @@ if (action === 'booking') {
   return [out({ ...info, status: 'cancellable', update: { booking_id: a.booking_id, status: 'Cancelled', cancelled_at: STAMP } })];
 }
 
-throw new Error(`Unknown action "${action}". Use slots, check, reminders, schedule or booking.`);
+// ============ 5f. INFO: facts for the front desk (f0), so the chat can never contradict the booking form ============
+// Open now? When does it open next? The next 14 days spelled out, so the AI never has to do date maths itself.
+if (action === 'info') {
+  const clinicClosed = d => CLINIC.daysOff.includes(weekday(d)) || closures.some(c => c.date === d && c.doctor === '*');
+  const openNow = !clinicClosed(TODAY) && CLINIC.sessions.some(([a, b]) => NOW_MIN >= toMin(a) && NOW_MIN < toMin(b));
+  let opensNext = '';
+  if (!openNow) {
+    for (let i = 0; i <= 14 && !opensNext; i++) {
+      const d = addDays(TODAY, i);
+      if (clinicClosed(d)) continue;
+      const s = CLINIC.sessions.find(([a]) => i > 0 || toMin(a) > NOW_MIN);
+      if (s) opensNext = (i === 0 ? 'today' : i === 1 ? 'tomorrow' : dateLabel(d)) + ' at ' + timeLabel(s[0]);
+    }
+  }
+  const session = CLINIC.sessions.find(([a, b]) => NOW_MIN >= toMin(a) && NOW_MIN < toMin(b));
+  const days = [];
+  for (let i = 0; i < 14; i++) {
+    const d = addDays(TODAY, i);
+    const away = Object.keys(CLINIC.doctors).filter(n => closedWhy(n, d));
+    days.push({ date: d, label: dateLabel(d) + (i === 0 ? ' (today)' : i === 1 ? ' (tomorrow)' : ''),
+      note: clinicClosed(d) ? 'clinic closed' : away.length ? away.join(' and ') + ' away' : '' });
+  }
+  return [out({ status: 'ok', today: TODAY, now_label: whenLabel(TODAY, nowStr.slice(11, 16)), open_now: openNow,
+    closes_at: openNow && session ? timeLabel(session[1]) : '', opens_next: opensNext,
+    doctors: Object.entries(CLINIC.doctors).map(([name, d]) => ({ name, specialty: d.specialty })), visit_types: CLINIC.visitTypes, days })];
+}
+
+// ============ 5g. AVAILABILITY: free times for the front desk, before anyone gives their details ============
+// Never throws on bad input: the chat passes along whatever the patient typed, so mistakes come back as a status.
+if (action === 'availability') {
+  const asked = normDate(data.date);
+  const wanted = clean(data.doctor);
+  const anyDoctor = !wanted || ['any', 'any doctor', 'either'].includes(key(wanted));
+  const doctor = anyDoctor ? '' : DOCTOR_BY_KEY[key(wanted.replace(/^(doctor|dr)\b\.?\s*/i, 'dr '))] || DOCTOR_BY_KEY[key(wanted)];
+  const doctorNames = Object.keys(CLINIC.doctors);
+  const availabilityFor = list => {
+    if (!asked) return [out({ status: 'bad_date', asked_date: clean(data.date), hint: 'Use YYYY-MM-DD.' })];
+    if (asked > LAST_DAY) return [out({ status: 'too_far', asked_date: asked, last_day: LAST_DAY, last_day_label: dateLabel(LAST_DAY) })];
+    const results = list.map(name => {
+      const from = asked < TODAY ? TODAY : asked;
+      let date = from, times = freeTimes(name, from), note = '';
+      if (!times.length || asked < TODAY) {
+        const why = noTimesWhy(name, asked);
+        if (!times.length) {
+          date = '';
+          for (let d = addDays(from, 1); d <= LAST_DAY; d = addDays(d, 1)) if (freeTimes(name, d).length) { date = d; break; }
+          times = date ? freeTimes(name, date) : [];
+        }
+        note = why[0].toUpperCase() + why.slice(1) + '.' + (date ? ` Next day with free times: ${dateLabel(date)}.` : ` No free times in the next ${CLINIC.maxDaysAhead} days.`);
+      }
+      return { doctor: name, specialty: specialty(name), date, date_label: date ? dateLabel(date) : '', moved: date !== asked, note, times: times.map(timeLabel), times_24: times };
+    });
+    // Upcoming bookings on this mobile number, for the chat's caps. A family often shares one phone and one email,
+    // so a person is the mobile number plus the name: at most maxUpcomingPerPatient each, and maxUpcomingPerPhone in all.
+    // Email isn't used: families share it even more.
+    const phone = normPhone(data.phone);
+    const onPhone = phone ? appts.filter(x => !x.cancelled && x.date && x.date >= TODAY && normPhone(x.phone) === phone) : [];
+    const nameKey = v => clean(v).toLowerCase().replace(/[^a-z\u0600-\u06ff]+/g, ' ').trim();
+    return [out({ status: 'ok', asked_date: asked, results, visit_types: CLINIC.visitTypes,
+      phone_upcoming: onPhone.length, phone_upcoming_names: onPhone.map(x => nameKey(x.patient_name)),
+      max_upcoming: CLINIC.maxUpcomingPerPatient, max_per_phone: CLINIC.maxUpcomingPerPhone || 4 })];
+  };
+  if (!anyDoctor && !doctor) {
+    // Whole words only: "usman", "doctor usman", "Dr. Ali" find one doctor; "a" or "ali khan" (two doctors' words) find none.
+    const words = key(wanted).replace(/^(doctor|dr)\s*/, '').split(' ').filter(Boolean);
+    const hit = words.length ? doctorNames.filter(n => words.every(w => key(n).split(' ').includes(w))) : [];
+    if (hit.length !== 1) return [out({ status: 'unknown_doctor', asked_doctor: wanted, doctors: doctorNames })];
+    return availabilityFor([hit[0]]);
+  }
+  return availabilityFor(anyDoctor ? doctorNames : [doctor]);
+}
+
+throw new Error(`Unknown action "${action}". Use slots, check, reminders, schedule, booking, info or availability.`);

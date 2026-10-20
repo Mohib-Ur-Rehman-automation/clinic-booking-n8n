@@ -15,13 +15,17 @@ const TEAL = '#0F766E', APRICOT = '#FF8B5A', PEACH = '#FFE2C2', PAPER = '#FFF8F1
   EUCALYPTUS = '#6B8F7A', SLATE_BG = '#E2E8F0', ALERT = '#B42318', BROWN = '#7A3410', WHITE = '#FFFFFF', LINE = '#E8D9C6';
 const DOCTOR_COLOURS = [['#741B47', WHITE], ['#073763', WHITE], ['#B45309', WHITE], ['#1D4ED8', WHITE]];   // one per doctor, in DOCTORS order
 // Header colour per tab
-const HEAD = { Appointments: '#115762', 'Request Log': '#4A0241', Closures: '#541414', Upcoming: INK };
+const HEAD = { Appointments: '#115762', 'Request Log': '#4A0241', Closures: '#541414', Upcoming: INK, Handoffs: '#7A3410', 'Front Desk Log': '#334155', 'Red Team': '#B42318' };
 const FONT = 'Figtree';
 
 const APPOINTMENTS = ['booking_id', 'booked_at', 'status', 'doctor', 'date', 'day', 'time', 'patient_name', 'phone', 'email', 'visit_type', 'reminder', 'cancel_token', 'cancelled_at'];
 const REQUEST_LOG = ['booking_id', 'requested_at', 'finished_at', 'outcome', 'doctor', 'requested_date', 'offered_date', 'chosen_time', 'patient_name', 'phone', 'email', 'visit_type', 'reason', 'confirmation_email'];
 const CLOSURES = ['date', 'doctor', 'reason'];
 const UPCOMING = ['Date', 'Day', 'Time', 'Doctor', 'Patient', 'Visit', 'Phone', 'Token'];
+// Front desk (Sera, the website chat): f3 writes Handoffs, f0 writes Front Desk Log
+const HANDOFFS = ['ref', 'created_at', 'reason', 'patient_name', 'contact', 'summary', 'status'];
+const RED_TEAM = ['run_at', 'id', 'category', 'severity', 'attack', 'verdict', 'failed_checks', 'conversation', 'bookings_made', 'seconds'];
+const FRONT_DESK_LOG = ['at', 'session_id', 'route', 'patient_message', 'reply', 'tools_used', 'booking_id', 'handoff_ref', 'seconds'];
 
 function setupClinicSheet() {
   const ss = SpreadsheetApp.getActive();
@@ -77,6 +81,41 @@ function setupClinicSheet() {
     ...doctorChips_('$E2', col_(lg, 'doctor', REQUEST_LOG)),
   ]);
 
+  // ---- Handoffs: questions Sera passed to a person. Staff set status to Done when it's dealt with ----
+  const ho = dataTab_(ss, 'Handoffs', HANDOFFS, BROWN, [96, 150, 190, 150, 170, 420, 96]);
+  const hoRows = body_(ho, HANDOFFS.length);
+  col_(ho, 'summary', HANDOFFS).setWrap(true);
+  listRule_(ho, 'status', HANDOFFS, ['Open', 'Done']);
+  ho.setConditionalFormatRules([
+    rule_('=$G2="Done"', [hoRows], r => r.setFontColor(MUTED).setStrikethrough(true).setBackground(SLATE_BG)),
+    rule_('=AND($G2="Open",OR($C2="Medical question",$C2="Complaint"))', [col_(ho, 'reason', HANDOFFS)], r => r.setBackground(APRICOT).setFontColor(INK).setBold(true)),
+    rule_('=$G2="Open"', [col_(ho, 'status', HANDOFFS)], r => r.setBackground(ALERT).setFontColor(WHITE).setBold(true)),
+  ]);
+  note_(ho, 'status', HANDOFFS, 'Set to Done once someone has called or emailed the patient back.');
+  note_(ho, 'reason', HANDOFFS, 'Medical questions and complaints are highlighted: reply to those the same day.');
+
+  // ---- Front Desk Log: one row per chat message, for checking what Sera said ----
+  const fd = dataTab_(ss, 'Front Desk Log', FRONT_DESK_LOG, '#334155', [150, 180, 96, 300, 380, 84, 110, 96, 72]);
+  col_(fd, 'patient_message', FRONT_DESK_LOG).setWrap(true);
+  col_(fd, 'reply', FRONT_DESK_LOG).setWrap(true);
+  const route = col_(fd, 'route', FRONT_DESK_LOG);
+  fd.setConditionalFormatRules([
+    rule_('=$C2="emergency"', [route], r => r.setBackground(ALERT).setFontColor(WHITE).setBold(true)),
+    rule_('=$C2="ai_failed"', [route], r => r.setBackground(APRICOT).setFontColor(INK).setBold(true)),
+    rule_('=$G2<>""', [col_(fd, 'booking_id', FRONT_DESK_LOG)], r => r.setBackground(TEAL).setFontColor(WHITE).setBold(true)),
+    rule_('=$H2<>""', [col_(fd, 'handoff_ref', FRONT_DESK_LOG)], r => r.setBackground(PEACH).setFontColor(BROWN).setBold(true)),
+  ]);
+  note_(fd, 'route', FRONT_DESK_LOG, 'agent = Sera answered · emergency = fixed 1122 reply, AI skipped · empty = nothing typed · ai_failed = Gemini did not answer, fallback reply sent.');
+
+  // ---- Red Team: results of r0 (attack conversations played against Sera, graded automatically) ----
+  const rt = dataTab_(ss, 'Red Team', RED_TEAM, ALERT, [150, 60, 140, 84, 320, 72, 360, 520, 120, 72]);
+  ['attack', 'failed_checks', 'conversation'].forEach(n => col_(rt, n, RED_TEAM).setWrap(true));
+  rt.setConditionalFormatRules([
+    rule_('=$F2="PASS"', [col_(rt, 'verdict', RED_TEAM)], r => r.setBackground(TEAL).setFontColor(WHITE).setBold(true)),
+    rule_('=$F2="FAIL"', [col_(rt, 'verdict', RED_TEAM)], r => r.setBackground(ALERT).setFontColor(WHITE).setBold(true)),
+    rule_('=$D2="critical"', [col_(rt, 'severity', RED_TEAM)], r => r.setFontColor(ALERT).setBold(true)),
+  ]);
+
   // ---- Upcoming: a read-only board built from Appointments ----
   const up = ss.getSheetByName('Upcoming') || ss.insertSheet('Upcoming');
   up.getBandings().forEach(b => b.remove());
@@ -108,9 +147,11 @@ function setupClinicSheet() {
   up.setTabColor(INK);
 
   // ---- Tab order ----
-  ['Upcoming', 'Appointments', 'Closures', 'Request Log'].forEach((n, i) => { ss.setActiveSheet(ss.getSheetByName(n)); ss.moveActiveSheet(i + 1); });
+  ['Upcoming', 'Appointments', 'Closures', 'Request Log', 'Handoffs', 'Front Desk Log', 'Red Team'].forEach((n, i) => { ss.setActiveSheet(ss.getSheetByName(n)); ss.moveActiveSheet(i + 1); });
   ss.setActiveSheet(up);
-  SpreadsheetApp.getUi().alert('Clinic sheet is set up: Upcoming, Appointments, Closures, Request Log.\n\nTabs named "(old …)" hold the previous test data. Delete them whenever you like.');
+  const done = 'Clinic sheet is set up: Upcoming, Appointments, Closures, Request Log, Handoffs, Front Desk Log, Red Team.\n\nTabs named "(old …)" hold the previous test data. Delete them whenever you like.';
+  Logger.log(done);
+  try { SpreadsheetApp.getUi().alert(done); } catch (e) { /* run from the script editor: no pop-up there, the log line above says the same */ }
 }
 
 // Creates or re-formats a data tab. Data cells are Plain text (except Closures dates), so Sheets never turns

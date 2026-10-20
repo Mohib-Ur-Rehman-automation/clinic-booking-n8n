@@ -1,0 +1,923 @@
+{
+  "name": "f2. front-desk-book",
+  "nodes": [
+    {
+      "parameters": {
+        "content": "## f2 · Book (Sera's tool)\nSera calls this only after the patient said yes to the details. It runs the **same checks as the booking form**:\n1. **Check Time**: d0 confirms that exact time is free that exact day (no silent move to another day).\n2. **Shape**: all seven details present, one doctor, a real visit type.\n3. **Find Times** + **Final Check**: d0 validates name, mobile and email, then re-checks the slot at the last moment.\n4. **Save**, **confirm by email**, **log** in Request Log, exactly like d1.\n\nAnything wrong returns `not_booked` with a plain reason and free alternatives, and nothing is written.",
+        "height": 290,
+        "width": 700
+      },
+      "id": "ed0e6549-d698-4593-b3fe-a5a08047ffd2",
+      "name": "Note: f2",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -40,
+        -470
+      ]
+    },
+    {
+      "parameters": {
+        "inputSource": "workflowInputs",
+        "workflowInputs": {
+          "values": [
+            {
+              "name": "patient_name",
+              "type": "string"
+            },
+            {
+              "name": "phone",
+              "type": "string"
+            },
+            {
+              "name": "email",
+              "type": "string"
+            },
+            {
+              "name": "doctor",
+              "type": "string"
+            },
+            {
+              "name": "visit_type",
+              "type": "string"
+            },
+            {
+              "name": "date",
+              "type": "string"
+            },
+            {
+              "name": "time",
+              "type": "string"
+            },
+            {
+              "name": "gate",
+              "type": "string"
+            }
+          ]
+        }
+      },
+      "id": "8860f368-8eb1-4bdf-9c0c-5a4d1e5087e5",
+      "name": "Start",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        0,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "PICK_D0_CLINIC_CORE",
+          "mode": "id"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "action": "availability",
+            "data": "={{ { doctor: $json.doctor, date: $json.date, phone: $json.phone, email: $json.email } }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "action",
+              "displayName": "action",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string"
+            },
+            {
+              "id": "data",
+              "displayName": "data",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "object"
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "options": {}
+      },
+      "id": "6c2566b8-d9e4-4e30-af36-fc8c564d9a67",
+      "name": "Check Time",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.2,
+      "position": [
+        220,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// f2 · Shape: checks what Sera sent before anything is booked.\n// d0 has already answered \"is this time free?\" (Check Time). Here: are all details present, is it one doctor,\n// is it the exact day asked (no silent move to another day), is the time really free, is the visit type real?\n// Anything wrong -> ready: false and a plain reason Sera can pass on. Nothing is booked.\n// First of all, the gate: sealed by f0's Prep node, never written by the AI. No yes in the patient's own message,\n// or no bookings left in this chat, means no booking, whatever the AI was talked into. No gate at all also means no.\nconst inp = $('Start').first().json;\nconst a = $('Check Time').first().json;\nconst clean = v => String(v ?? '').trim();\nconst key = v => clean(v).toLowerCase().replace(/[^a-z0-9]/g, '');\nconst pad = n => String(n).padStart(2, '0');\nconst label = t => { const h = Number(t.slice(0, 2)); return (h % 12 || 12) + ':' + t.slice(3, 5) + (h >= 12 ? ' PM' : ' AM'); };\n// \"5:20 PM\", \"5.20pm\", \"17:20\", \"5 pm\" -> \"17:20\", or ''\nfunction to24(v) {\n  const s = clean(v).toLowerCase().replace(/\\s+/g, '').replace('.', ':');\n  const m = s.match(/^(\\d{1,2})(?::(\\d{2}))?(am|pm)?$/);\n  if (!m) return '';\n  let h = +m[1]; const min = m[2] === undefined ? 0 : +m[2];\n  if (min > 59 || h > 23 || (m[3] && (h < 1 || h > 12)) || (!m[3] && m[2] === undefined)) return '';\n  if (m[3] === 'pm' && h < 12) h += 12;\n  if (m[3] === 'am' && h === 12) h = 0;\n  return pad(h) + ':' + pad(min);\n}\nconst fail = (reason, extra = {}) => [{ json: { ready: false, result: { kind: 'book', status: 'not_booked', reason, ...extra,\n  _trace: [{ icon: 'skip', text: 'Booking not attempted: ' + reason }] } } }];\n\nlet gate = {};\ntry { gate = JSON.parse(inp.gate || '{}') || {}; } catch (e) { gate = {}; }\nif (gate.affirm !== true) return fail('The patient hasn\\'t confirmed in this message. Repeat the details in one line and ask them to say yes.', { needs: 'confirmation' });\nif (!(gate.bookings_left > 0)) return fail('This chat has already made its bookings. For more, the patient can call reception or use the booking form.', { needs: 'reception' });\n\nconst need = { patient_name: 'full name', phone: 'mobile number', email: 'email', doctor: 'doctor', visit_type: 'visit type', date: 'date', time: 'time' };\nconst missing = Object.keys(need).filter(k => !clean(inp[k]));\nif (missing.length) return fail('Missing details: ' + missing.map(k => need[k]).join(', ') + '.', { missing: missing.map(k => need[k]) });\n\nif (a.status === 'unknown_doctor') return fail(`There is no doctor called \"${a.asked_doctor}\". The doctors are ${a.doctors.join(' and ')}.`);\nif (a.status === 'bad_date') return fail(`The date \"${a.asked_date}\" can't be read. Send it as YYYY-MM-DD.`);\nif (a.status === 'too_far') return fail(`Online booking only goes up to ${a.last_day_label}.`);\nif (a.status !== 'ok' || a.results.length !== 1) return fail('Choose one doctor before booking.');\n\n// A full name, so two people on one family phone stay apart: at least a first and a last name.\nconst nameParts = clean(inp.patient_name).split(/\\s+/).filter(w => /\\p{L}{2,}/u.test(w));\nif (nameParts.length < 2) return fail('Ask for the patient\\'s full name (first and last name) before booking.', { missing: ['full name'] });\n// Caps: a person is the mobile number plus the name. Family members sharing a phone each get their own visits.\nconst nameKey = v => clean(v).toLowerCase().replace(/[^a-z\\u0600-\\u06ff]+/g, ' ').trim();\nconst mine = (a.phone_upcoming_names || []).filter(n => n === nameKey(inp.patient_name)).length;\nif (mine >= a.max_upcoming) {\n  return fail(`${clean(inp.patient_name)} already has ${mine} upcoming visits booked, the most the chat can book for one person. Reception can help with more.`, { needs: 'reception' });\n}\nif ((a.phone_upcoming || 0) >= (a.max_per_phone || 4)) {\n  return fail(`This mobile number already has ${a.phone_upcoming} upcoming visits booked, the most the chat can book for one number. Reception can help with more.`, { needs: 'reception' });\n}\nconst r = a.results[0];\nif (r.moved || r.date !== a.asked_date) {\n  return fail(`No free times with ${r.doctor} that day. ${r.note}`, r.times.length ? { next_day: r.date_label, next_day_date: r.date, free_times: r.times.slice(0, 6) } : {});\n}\nconst t = to24(inp.time);\nif (!t) return fail(`The time \"${clean(inp.time)}\" can't be read. Use one of the free times, like ${r.times[0]}.`, { free_times: r.times.slice(0, 6) });\nif (!r.times_24.includes(t)) {\n  const mins = s => Number(s.slice(0, 2)) * 60 + Number(s.slice(3, 5));\n  const near = [...r.times_24].sort((x, y) => Math.abs(mins(x) - mins(t)) - Math.abs(mins(y) - mins(t))).slice(0, 4).sort().map(label);\n  return fail(`${label(t)} isn't free with ${r.doctor} on ${r.date_label}.`, { free_times: near });\n}\nconst vk = key(inp.visit_type);\nconst visit = vk.length >= 3 ? (a.visit_types || []).find(v => key(v) === vk || key(v).startsWith(vk)) : undefined;\nif (!visit) return fail(`The visit type must be one of: ${(a.visit_types || []).join(', ')}.`);\n\nreturn [{ json: { ready: true, doctor: r.doctor, date: r.date, date_label: r.date_label, time24: t, chosen: label(t),\n  form: { 'Patient name': clean(inp.patient_name), Phone: clean(inp.phone), Email: clean(inp.email), Doctor: r.doctor, 'Visit type': visit, 'Preferred date': r.date } } }];\n"
+      },
+      "id": "9f1b66de-a127-43e4-acfe-e3934da35dd3",
+      "name": "Shape",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        440,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "e621f1ce-f147-4b06-9a8e-dfecfd704216",
+              "leftValue": "={{ $json.ready === true }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "a8dddc50-ea8f-455b-a0f5-8a8d51195f69",
+      "name": "Ready?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        660,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "PICK_D0_CLINIC_CORE",
+          "mode": "id"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "action": "slots",
+            "data": "={{ $json.form }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "action",
+              "displayName": "action",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string"
+            },
+            {
+              "id": "data",
+              "displayName": "data",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "object"
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "options": {}
+      },
+      "id": "8e9fd633-6195-4afd-9b31-b4568d430819",
+      "name": "Find Times",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.2,
+      "position": [
+        880,
+        -120
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "6c7b222b-f531-4073-8a9e-f98de6f8ac30",
+              "leftValue": "={{ $json.status === 'choose' && $json.date === $('Shape').first().json.date && ($json.times || []).includes($('Shape').first().json.time24) }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "a1ce6dae-d1c2-4f22-ab37-ce1e11e1adbe",
+      "name": "Can Book?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1100,
+        -120
+      ]
+    },
+    {
+      "parameters": {
+        "action": "generate",
+        "dataPropertyName": "cancel_token",
+        "encodingType": "uuid"
+      },
+      "id": "0f90ac16-caeb-4a9c-ae61-d0de02fdda0a",
+      "name": "Make Cancel Token",
+      "type": "n8n-nodes-base.crypto",
+      "typeVersion": 2,
+      "position": [
+        1100,
+        -320
+      ]
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "PICK_D0_CLINIC_CORE",
+          "mode": "id"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "action": "check",
+            "data": "={{ { request: $('Find Times').first().json, chosen: $('Shape').first().json.chosen, cancel_token: $json.cancel_token } }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "action",
+              "displayName": "action",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string"
+            },
+            {
+              "id": "data",
+              "displayName": "data",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "object"
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "options": {}
+      },
+      "id": "69fc287c-6225-4899-93f7-75dcc5b76b2e",
+      "name": "Final Check",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.2,
+      "position": [
+        1320,
+        -320
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "7bab5ecc-765f-4e99-bd59-d10504b09d0c",
+              "leftValue": "={{ $json.status === 'book' }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "3ab871be-9c91-4aed-ac7b-cd48d578cf9e",
+      "name": "Book It?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1540,
+        -320
+      ]
+    },
+    {
+      "parameters": {
+        "authentication": "serviceAccount",
+        "operation": "appendOrUpdate",
+        "documentId": {
+          "__rl": true,
+          "value": "YOUR_SHEET_ID",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "Appointments",
+          "mode": "name"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "booking_id": "={{ $json.row.booking_id }}",
+            "booked_at": "={{ $json.row.booked_at }}",
+            "status": "={{ $json.row.status }}",
+            "doctor": "={{ $json.row.doctor }}",
+            "date": "={{ $json.row.date }}",
+            "day": "={{ $json.row.day }}",
+            "time": "={{ $json.row.time }}",
+            "patient_name": "={{ $json.row.patient_name }}",
+            "phone": "={{ $json.row.phone }}",
+            "email": "={{ $json.row.email }}",
+            "visit_type": "={{ $json.row.visit_type }}",
+            "reminder": "={{ $json.row.reminder }}",
+            "cancel_token": "={{ $json.row.cancel_token }}",
+            "cancelled_at": "={{ $json.row.cancelled_at }}"
+          },
+          "matchingColumns": [
+            "booking_id"
+          ],
+          "schema": [
+            {
+              "id": "booking_id",
+              "displayName": "booking_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "booked_at",
+              "displayName": "booked_at",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "status",
+              "displayName": "status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "doctor",
+              "displayName": "doctor",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "date",
+              "displayName": "date",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "day",
+              "displayName": "day",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "time",
+              "displayName": "time",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "patient_name",
+              "displayName": "patient_name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "phone",
+              "displayName": "phone",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "email",
+              "displayName": "email",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "visit_type",
+              "displayName": "visit_type",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "reminder",
+              "displayName": "reminder",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "cancel_token",
+              "displayName": "cancel_token",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "cancelled_at",
+              "displayName": "cancelled_at",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {
+          "cellFormat": "RAW"
+        }
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        1760,
+        -420
+      ],
+      "id": "14a6ef78-c45d-4fb2-8fe1-65bd933e4099",
+      "name": "Save Appointment"
+    },
+    {
+      "parameters": {
+        "fromEmail": "={{ $('Final Check').first().json.email.from }}",
+        "toEmail": "={{ $('Final Check').first().json.email.to }}",
+        "subject": "={{ $('Final Check').first().json.email.subject }}",
+        "emailFormat": "both",
+        "text": "={{ $('Final Check').first().json.email.text }}",
+        "html": "={{ $('Final Check').first().json.email.html }}",
+        "options": {
+          "appendAttribution": false
+        }
+      },
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "position": [
+        1980,
+        -420
+      ],
+      "id": "f9b9529b-5f87-4815-9885-1eb49d404bd8",
+      "name": "Send Confirmation",
+      "webhookId": "83bf8ac1-ab3e-4bd4-a684-8cb014d66a2d",
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "// f2 · Finish: one Request Log row for every chat booking that reached d0's final check, booked or not.\n// Same columns as d1's log, so reception sees form and chat bookings in one place.\nconst failMsg = j => j.error ? String(j.error.message || j.error.description || j.error) : (Array.isArray(j.rejected) && j.rejected.length ? 'rejected by the mail server: ' + j.rejected.join(', ') : '');\nconst req = $('Find Times').first().json;\nconst chk = $('Final Check').first().json;\nconst booked = chk.status === 'book';\nconst emailStatus = booked && $('Send Confirmation').isExecuted ? (failMsg($('Send Confirmation').first().json) ? 'Failed: ' + failMsg($('Send Confirmation').first().json) : 'Sent') : '';\nconst p = req.patient || {};\nreturn [{ json: { email_status: emailStatus, log: {\n  booking_id: req.booking_id,\n  requested_at: req.requested_at,\n  finished_at: chk.now,\n  outcome: chk.outcome,\n  doctor: req.doctor,\n  requested_date: req.requested_date || '',\n  offered_date: req.date || '',\n  chosen_time: chk.time || '',\n  patient_name: p.name || '',\n  phone: p.phone || '',\n  email: p.email || '',\n  visit_type: req.visit_type,\n  reason: booked ? 'Booked in the website chat (Sera)' : 'Website chat (Sera): ' + (chk.reason || ''),\n  confirmation_email: emailStatus,\n} } }];\n"
+      },
+      "id": "dc82b9eb-e9d9-46d8-b6b8-6f140c05bcd8",
+      "name": "Finish",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2200,
+        -320
+      ]
+    },
+    {
+      "parameters": {
+        "authentication": "serviceAccount",
+        "operation": "appendOrUpdate",
+        "documentId": {
+          "__rl": true,
+          "value": "YOUR_SHEET_ID",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "Request Log",
+          "mode": "name"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "booking_id": "={{ $json.log.booking_id }}",
+            "requested_at": "={{ $json.log.requested_at }}",
+            "finished_at": "={{ $json.log.finished_at }}",
+            "outcome": "={{ $json.log.outcome }}",
+            "doctor": "={{ $json.log.doctor }}",
+            "requested_date": "={{ $json.log.requested_date }}",
+            "offered_date": "={{ $json.log.offered_date }}",
+            "chosen_time": "={{ $json.log.chosen_time }}",
+            "patient_name": "={{ $json.log.patient_name }}",
+            "phone": "={{ $json.log.phone }}",
+            "email": "={{ $json.log.email }}",
+            "visit_type": "={{ $json.log.visit_type }}",
+            "reason": "={{ $json.log.reason }}",
+            "confirmation_email": "={{ $json.log.confirmation_email }}"
+          },
+          "matchingColumns": [
+            "booking_id"
+          ],
+          "schema": [
+            {
+              "id": "booking_id",
+              "displayName": "booking_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "requested_at",
+              "displayName": "requested_at",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "finished_at",
+              "displayName": "finished_at",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "outcome",
+              "displayName": "outcome",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "doctor",
+              "displayName": "doctor",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "requested_date",
+              "displayName": "requested_date",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "offered_date",
+              "displayName": "offered_date",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "chosen_time",
+              "displayName": "chosen_time",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "patient_name",
+              "displayName": "patient_name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "phone",
+              "displayName": "phone",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "email",
+              "displayName": "email",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "visit_type",
+              "displayName": "visit_type",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "reason",
+              "displayName": "reason",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "confirmation_email",
+              "displayName": "confirmation_email",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {
+          "cellFormat": "RAW"
+        }
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        2420,
+        -320
+      ],
+      "id": "5825bad5-3cdf-4f3a-974d-f721d15a9390",
+      "name": "Log Request"
+    },
+    {
+      "parameters": {
+        "jsCode": "// f2 · Result: what Sera hears back after a booking attempt, plus trace lines and the ticket for the page.\n// Paths: details not ready · d0 refused the details · time gone by the final check · booked (email sent or failed).\nconst label = t => { const h = Number(t.slice(0, 2)); return (h % 12 || 12) + ':' + t.slice(3, 5) + (h >= 12 ? ' PM' : ' AM'); };\nconst shape = $('Shape').first().json;\nif (!shape.ready) return [{ json: shape.result }];\n\nconst trace = [{ icon: 'search', text: `Checked the clinic's rules: ${shape.chosen} is free with ${shape.doctor}, ${shape.date_label}` }];\nconst slots = $('Find Times').first().json;\nif (!$('Final Check').isExecuted) {\n  if (slots.status === 'refused') {\n    trace.push({ icon: 'skip', text: `Details refused: ${slots.outcome.toLowerCase()}` });\n    return [{ json: { kind: 'book', status: 'not_booked', reason: slots.reason, fix: slots.errors || [], _trace: trace } }];\n  }\n  trace.push({ icon: 'skip', text: `${shape.chosen} was taken a moment ago` });\n  return [{ json: { kind: 'book', status: 'not_booked', reason: `Someone else just took ${shape.chosen}.`,\n    free_times: (slots.times || []).slice(0, 6).map(label), _trace: trace } }];\n}\ntrace.push({ icon: 'rules', text: 'Checked the name, mobile number and email' });\nconst chk = $('Final Check').first().json;\nif (chk.status !== 'book') {\n  trace.push({ icon: 'skip', text: `Last-second re-check stopped it: ${chk.outcome.toLowerCase()}` }, { icon: 'sheet', text: 'Attempt written to Request Log' });\n  return [{ json: { kind: 'book', status: 'not_booked', reason: chk.reason, _trace: trace } }];\n}\nconst fin = $('Finish').first().json;\nconst emailOk = fin.email_status === 'Sent';\ntrace.push({ icon: 'lock', text: `Re-checked at the last second, then saved to Appointments as ${chk.booking_id}` },\n  { icon: emailOk ? 'mail' : 'alert', text: emailOk ? `Confirmation email sent to ${chk.patient.email}` : `Confirmation email failed: ${fin.email_status.replace(/^Failed: /, '')}` },\n  { icon: 'sheet', text: 'Written to Request Log (outcome: Booked)' });\nreturn [{ json: {\n  kind: 'book', status: 'booked', booking_id: chk.booking_id, when: chk.when, doctor: chk.doctor, visit_type: chk.visit_type,\n  confirmation_email: emailOk ? 'sent' : 'failed',\n  ticket: { booking_id: chk.booking_id, when: chk.when, doctor: chk.doctor, specialty: chk.doctor_specialty, visit_type: chk.visit_type,\n    patient_name: chk.patient.name, email: chk.patient.email, email_sent: emailOk, cancel_link: chk.cancel_link, calendar_link: chk.calendar_link || '' },\n  _trace: trace,\n} }];\n"
+      },
+      "id": "8d3bc931-1e1e-4e6b-83f5-2f0fe206f8fd",
+      "name": "Result",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2640,
+        0
+      ]
+    }
+  ],
+  "connections": {
+    "Start": {
+      "main": [
+        [
+          {
+            "node": "Check Time",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Time": {
+      "main": [
+        [
+          {
+            "node": "Shape",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Shape": {
+      "main": [
+        [
+          {
+            "node": "Ready?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ready?": {
+      "main": [
+        [
+          {
+            "node": "Find Times",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Find Times": {
+      "main": [
+        [
+          {
+            "node": "Can Book?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Can Book?": {
+      "main": [
+        [
+          {
+            "node": "Make Cancel Token",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Make Cancel Token": {
+      "main": [
+        [
+          {
+            "node": "Final Check",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Final Check": {
+      "main": [
+        [
+          {
+            "node": "Book It?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Book It?": {
+      "main": [
+        [
+          {
+            "node": "Save Appointment",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Finish",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Save Appointment": {
+      "main": [
+        [
+          {
+            "node": "Send Confirmation",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Confirmation": {
+      "main": [
+        [
+          {
+            "node": "Finish",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Finish": {
+      "main": [
+        [
+          {
+            "node": "Log Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Log Request": {
+      "main": [
+        [
+          {
+            "node": "Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "timezone": "Asia/Karachi",
+    "callerPolicy": "workflowsFromSameOwner"
+  },
+  "tags": []
+}

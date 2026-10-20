@@ -7,7 +7,8 @@ const CODE_DIR = process.env.CODE_DIR || path.join(__dirname, '..', 'code');
 const load = name => fs.readFileSync(path.join(CODE_DIR, name), 'utf8');
 
 // nodes: { 'Node Name': json | [json] | { executed: false } }
-function run(src, { nodes = {}, input = [], nowUTC = '2026-10-19T04:00:00Z' } = {}) {
+// staticData: the object $getWorkflowStaticData('global') returns (n8n keeps it between production runs)
+function run(src, { nodes = {}, input = [], nowUTC = '2026-10-19T04:00:00Z', staticData = {} } = {}) {
   const fixed = new Date(nowUTC).getTime();
   const $ = name => {
     const v = nodes[name];
@@ -21,8 +22,9 @@ function run(src, { nodes = {}, input = [], nowUTC = '2026-10-19T04:00:00Z' } = 
   const $now = DateTime.fromMillis(fixed).setZone('Asia/Karachi');
   // n8n's Code sandbox has no Node-only globals; hide them so tests fail the same way n8n would.
   const HIDDEN = ['URLSearchParams', 'URL', 'Buffer', 'require', 'process', 'global', 'globalThis', 'setImmediate', 'TextEncoder', 'TextDecoder', 'structuredClone', 'fetch'];
-  const fn = new Function('$', '$input', '$now', 'DateTime', ...HIDDEN, src);
-  const res = fn($, $input, $now, DateTime, ...HIDDEN.map(() => undefined));
+  const $getWorkflowStaticData = () => staticData;
+  const fn = new Function('$', '$input', '$now', 'DateTime', '$getWorkflowStaticData', ...HIDDEN, src);
+  const res = fn($, $input, $now, DateTime, $getWorkflowStaticData, ...HIDDEN.map(() => undefined));
   if (!Array.isArray(res)) throw new Error('Code node must return an array of items');
   return res.map(i => i.json);
 }

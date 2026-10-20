@@ -237,6 +237,7 @@ for (const item of $input.all()) {
   if (j.action === 'check') {
     if (j.status === 'book') {
       const cal = calendarLink(j);
+      j.calendar_link = cal;   // the front desk's booking ticket uses it too
       // Rules decide when d3 will remind them (5b): the day before, the visit morning, or not at all (booked on the day).
       const reminderLine = { day_before: `A reminder email arrives at ${j.clinic.reminder_time} the day before your visit.`,
         visit_morning: `A reminder email arrives tomorrow at ${j.clinic.reminder_time}, the morning of your visit.` }[j.reminder_plan];

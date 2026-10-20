@@ -1,0 +1,377 @@
+{
+  "name": "f3. front-desk-hand-off",
+  "nodes": [
+    {
+      "parameters": {
+        "content": "## f3 · Hand off (Sera's tool)\nPasses a conversation to a person: medical questions, reschedules, complaints, questions Sera can't answer, or \"I want to talk to someone\".\n\nReception gets one email with a reference (HO-…), and a row lands in **Handoffs** with status Open. Without a phone number or email nothing is sent, and Sera is told to ask for one first.\n\nThe email and the sheet row each continue on error, so one failing doesn't lose the other.",
+        "height": 250,
+        "width": 640
+      },
+      "id": "43e7d54b-125a-4b3b-bc04-7beb9c47057a",
+      "name": "Note: f3",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -40,
+        -330
+      ]
+    },
+    {
+      "parameters": {
+        "inputSource": "workflowInputs",
+        "workflowInputs": {
+          "values": [
+            {
+              "name": "patient_name",
+              "type": "string"
+            },
+            {
+              "name": "contact",
+              "type": "string"
+            },
+            {
+              "name": "reason",
+              "type": "string"
+            },
+            {
+              "name": "summary",
+              "type": "string"
+            },
+            {
+              "name": "gate",
+              "type": "string"
+            }
+          ]
+        }
+      },
+      "id": "434bfaee-bdb0-42e7-b468-1cc99797c061",
+      "name": "Start",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        0,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "PICK_D0_CLINIC_CORE",
+          "mode": "id"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "action": "info",
+            "data": "={{ {} }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "action",
+              "displayName": "action",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string"
+            },
+            {
+              "id": "data",
+              "displayName": "data",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "object"
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "options": {}
+      },
+      "id": "0b459a8d-6d74-4b27-b270-c5100c740028",
+      "name": "Clinic Info",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.2,
+      "position": [
+        220,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// f3 · Build: turns Sera's hand-off into an email for reception and a row for the Handoffs tab.\n// The sheet node writes in RAW mode, so a summary starting with \"=\" stays text and can't become a formula.\n// Without a phone number or email nobody can call the patient back, so nothing is sent and Sera is told to ask.\nconst inp = $('Start').first().json;\nconst info = $('Clinic Info').first().json;\nconst c = info.clinic;\nconst clean = v => String(v ?? '').replace(/[\\u0000-\\u001F\\u007F]/g, ' ').trim();\nconst esc = v => clean(v).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\"/g, '&quot;');\n\nconst name = clean(inp.patient_name).slice(0, 80);\nconst contact = clean(inp.contact).slice(0, 120);\nconst summary = clean(inp.summary).slice(0, 1000);\nconst REASONS = { medical: 'Medical question', reschedule: 'Change or reschedule', complaint: 'Complaint', question: 'Question Sera could not answer', human: 'Asked for a person' };\nconst reason = REASONS[clean(inp.reason).toLowerCase()] ? clean(inp.reason).toLowerCase() : 'question';\n\n// The gate is sealed by f0's Prep node, not written by the AI: it caps hand-offs per chat, so nobody can flood reception.\nlet gate = {};\ntry { gate = JSON.parse(inp.gate || '{}') || {}; } catch (e) { gate = {}; }\nif (!(gate.handoffs_left > 0)) {\n  return [{ json: { ready: false, result: { kind: 'hand_off', status: 'not_sent', reason: 'This chat has already passed questions to reception. Tell the patient reception will reply, or to call the clinic.',\n    _trace: [{ icon: 'lock', text: 'Hand-off limit for this chat reached: nothing sent' }] } } }];\n}\nconst hasContact = /\\d{7,}/.test(contact.replace(/\\D/g, '')) || /\\S+@\\S+\\.\\S+/.test(contact);\nif (!hasContact) {\n  return [{ json: { ready: false, result: { kind: 'hand_off', status: 'not_sent', reason: 'Need a phone number or email so reception can reply. Ask the patient for one.',\n    _trace: [{ icon: 'skip', text: 'Hand-off held back: no phone number or email yet' }] } } }];\n}\nconst CH = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';\nlet ref = 'HO-';\nfor (let i = 0; i < 5; i++) ref += CH[Math.floor(Math.random() * CH.length)];\nconst label = REASONS[reason];\nconst urgent = reason === 'medical' || reason === 'complaint';\n\nconst html = `<div style=\"font-family:Helvetica,Arial,sans-serif;color:#0F172A;max-width:560px\">\n<p style=\"margin:0 0 6px;font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:#0F766E;font-weight:bold\">Front desk hand-off · ${esc(ref)}</p>\n<h2 style=\"margin:0 0 14px;font-size:20px\">${esc(label)}${urgent ? ' · please reply today' : ''}</h2>\n<table role=\"presentation\" cellpadding=\"0\" cellspacing=\"0\" style=\"width:100%;border-collapse:collapse;font-size:14px\">\n<tr><td style=\"padding:6px 0;color:#475569;width:110px\">Patient</td><td style=\"padding:6px 0\"><b>${esc(name) || 'Not given'}</b></td></tr>\n<tr><td style=\"padding:6px 0;color:#475569\">Contact</td><td style=\"padding:6px 0\">${esc(contact)}</td></tr>\n<tr><td style=\"padding:6px 0;color:#475569\">When</td><td style=\"padding:6px 0\">${esc(info.now)}</td></tr></table>\n<div style=\"margin:14px 0;padding:12px 14px;background:#FFF6EC;border-left:4px solid #FF8B5A;border-radius:6px;font-size:14px;line-height:1.5\">${esc(summary) || 'No summary given.'}</div>\n<p style=\"margin:0;font-size:13px;color:#475569\">Written by Sera, the website chat. Mark the row in <b>Handoffs</b> as Done when it's dealt with.</p></div>`;\nconst text = `Front desk hand-off ${ref}\\n${label}${urgent ? ' (please reply today)' : ''}\\n\\nPatient: ${name || 'Not given'}\\nContact: ${contact}\\nWhen: ${info.now}\\n\\n${summary || 'No summary given.'}\\n\\nWritten by Sera, the website chat. Mark the row in Handoffs as Done when it's dealt with.`;\n\nreturn [{ json: { ready: true, ref, label,\n  email: { from: c.from, to: c.admin, subject: `[Front desk] ${label}: ${name || 'patient'} (${ref})`, html, text },\n  row: { ref, created_at: info.now, reason: label, patient_name: name, contact, summary, status: 'Open' } } }];\n"
+      },
+      "id": "4c260e0c-bc99-4767-b3dc-035a9782cf23",
+      "name": "Build",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        440,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "36dcbe62-1751-44da-aa83-235ad50fc897",
+              "leftValue": "={{ $json.ready === true }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "28db57e0-2ee7-400f-b4a0-b167ff3d7c9d",
+      "name": "Ready?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        660,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "fromEmail": "={{ $json.email.from }}",
+        "toEmail": "={{ $json.email.to }}",
+        "subject": "={{ $json.email.subject }}",
+        "emailFormat": "both",
+        "text": "={{ $json.email.text }}",
+        "html": "={{ $json.email.html }}",
+        "options": {
+          "appendAttribution": false
+        }
+      },
+      "id": "5edbb338-6f99-4f19-a9de-8551ca98cf30",
+      "name": "Send to Reception",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "position": [
+        880,
+        -100
+      ],
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "authentication": "serviceAccount",
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "YOUR_SHEET_ID",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "Handoffs",
+          "mode": "name"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "ref": "={{ $('Build').first().json.row.ref }}",
+            "created_at": "={{ $('Build').first().json.row.created_at }}",
+            "reason": "={{ $('Build').first().json.row.reason }}",
+            "patient_name": "={{ $('Build').first().json.row.patient_name }}",
+            "contact": "={{ $('Build').first().json.row.contact }}",
+            "summary": "={{ $('Build').first().json.row.summary }}",
+            "status": "={{ $('Build').first().json.row.status }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "ref",
+              "displayName": "ref",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "created_at",
+              "displayName": "created_at",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "reason",
+              "displayName": "reason",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "patient_name",
+              "displayName": "patient_name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "contact",
+              "displayName": "contact",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "summary",
+              "displayName": "summary",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "status",
+              "displayName": "status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {
+          "cellFormat": "RAW"
+        }
+      },
+      "id": "f74870a4-f32d-4236-8cbf-25f3b23ec88c",
+      "name": "Save Handoff",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        1100,
+        -100
+      ],
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "// f3 · Result: what Sera hears back after a hand-off, plus trace lines for the page.\nconst b = $('Build').first().json;\nif (!b.ready) return [{ json: b.result }];\nconst s = $('Send to Reception').first().json;\nconst err = s.error ? String(s.error.message || s.error) : (Array.isArray(s.rejected) && s.rejected.length ? 'rejected by the mail server' : '');\nreturn [{ json: {\n  kind: 'hand_off', status: 'handed_off', ref: b.ref, reason: b.label, reception_emailed: !err,\n  _trace: [\n    { icon: err ? 'alert' : 'mail', text: err ? `Reception email failed (${err}); still saved in Handoffs` : `Reception emailed: ${b.label} (${b.ref})` },\n    { icon: 'sheet', text: `Written to Handoffs as ${b.ref}, status Open` },\n  ],\n} }];\n"
+      },
+      "id": "c4f5325a-636d-48ff-a227-128d6f35358e",
+      "name": "Result",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1320,
+        0
+      ]
+    }
+  ],
+  "connections": {
+    "Start": {
+      "main": [
+        [
+          {
+            "node": "Clinic Info",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Clinic Info": {
+      "main": [
+        [
+          {
+            "node": "Build",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build": {
+      "main": [
+        [
+          {
+            "node": "Ready?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ready?": {
+      "main": [
+        [
+          {
+            "node": "Send to Reception",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send to Reception": {
+      "main": [
+        [
+          {
+            "node": "Save Handoff",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Save Handoff": {
+      "main": [
+        [
+          {
+            "node": "Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "timezone": "Asia/Karachi",
+    "callerPolicy": "workflowsFromSameOwner"
+  },
+  "tags": []
+}
