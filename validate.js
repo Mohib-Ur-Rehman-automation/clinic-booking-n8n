@@ -31,7 +31,7 @@ for (const f of fs.readdirSync(WF).filter(f => f.endsWith('.json'))) {
   }
   console.log(`${f}: ${w.nodes.length} nodes OK`);
 }
-for (const s of ['d0-rules.test.js', 'd0-templates.test.js', 'flows.test.js', 'e0.test.js', 'stress.test.js', 'd0-frontdesk.test.js', 'frontdesk-flows.test.js', 'redteam.test.js']) {
+for (const s of ['d0-rules.test.js', 'd0-templates.test.js', 'flows.test.js', 'e0.test.js', 'stress.test.js', 'd0-frontdesk.test.js', 'frontdesk-flows.test.js', 'redteam.test.js', 'attacks.test.js', 'fuzz.test.js']) {
   try { process.stdout.write(execFileSync('node', [path.join(__dirname, 'tests', s)], { env: { ...process.env, CODE_DIR: tmp } }).toString()); }
   catch (e) { process.stdout.write(String(e.stdout || e.message)); problems++; }
 }

@@ -61,7 +61,9 @@ const LOGO_SVG = `<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 40 40' ar
 
 const esc = v => String(v ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
 const phoneShow = p => /^03\d{9}$/.test(String(p)) ? String(p).slice(0, 4) + '-' + String(p).slice(4) : String(p ?? '');
-const firstName = n => String(n ?? '').trim().split(/\s+/)[0] || 'there';
+// Emails greet by the first word of the name only if it looks like a name. Anything else ("claim-refund.com Khan") would
+// put a stranger's text, often a link, into a clinic email sent to whatever address was typed. Then it's "Hi there".
+const firstName = n => { const w = String(n ?? '').trim().split(/\s+/)[0] || ''; return /^\p{L}[\p{L}'’-]{0,23}$/u.test(w) ? w : 'there'; };
 const splitWhen = w => { const i = String(w).lastIndexOf(', '); return i < 0 ? [String(w), ''] : [w.slice(0, i), w.slice(i + 2)]; };   // "Tuesday 20 Oct, 5:20 PM"
 const initials = name => String(name).replace(/^dr\.?\s+/i, '').split(/\s+/).filter(Boolean).map(w => w[0]).join('').slice(0, 2).toUpperCase();
 const enc = encodeURIComponent;
@@ -228,6 +230,8 @@ for (const item of $input.all()) {
         body: '<ul>' + j.errors.map(e => `<li>${esc(e)}</li>`).join('') + '</ul>', button: { href: againLink(j, true), text: 'Back to the form' } });
     } else if (j.outcome === 'Too far ahead') {
       j.page_html = page(j, { step: 1, title: 'Choose an earlier date', lead: esc(j.reason), button: { href: againLink(j, false), text: 'Choose another date' } });
+    } else if (j.outcome === 'Busy' || j.outcome === 'Limit reached') {
+      j.page_html = page(j, { step: 1, title: j.outcome === 'Busy' ? 'Online booking is paused' : 'Already booked', lead: esc(j.reason) });
     } else {
       j.page_html = page(j, { step: 1, title: 'No free times', lead: esc(j.reason), body: p(`Please call ${esc(j.clinic.phone)} and the front desk will help you find a time.`) });
     }
@@ -257,6 +261,8 @@ for (const item of $input.all()) {
             `<p style="margin:10px 0 8px">Can't make it? Cancelling frees the time for another patient. You can cancel online up to ${j.clinic.cancel_cutoff_hours} hours before.</p>` + mailBtn(j.cancel_link, 'Cancel this appointment', 'quiet') }),
         text: `Hi ${firstName(j.patient.name)},\n\nYour appointment is booked.\n\n${textSlip(slip)}\n\nPlease arrive 10 minutes early.\nAdd to Google Calendar: ${cal}\nCan't make it? Cancel online up to ${j.clinic.cancel_cutoff_hours} hours before: ${j.cancel_link}` + textFoot(j),
       };
+    } else if (j.outcome === 'Busy' || j.outcome === 'Limit reached') {
+      j.page_html = page(j, { step: 2, title: j.outcome === 'Busy' ? 'Online booking is paused' : 'Already booked', lead: esc(j.reason) + ' Nothing was booked.' });
     } else {
       const titles = { 'Taken before submit': 'That time was just taken', 'Too late': 'That time is too close now', 'No free time': 'That day is no longer available',
         Declined: 'No appointment booked', Abandoned: 'This page has expired', 'Invalid details': 'Something went wrong with that time' };

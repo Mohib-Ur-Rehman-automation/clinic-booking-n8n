@@ -4,18 +4,22 @@
 const inp = $('Start').first().json;
 const info = $('Clinic Info').first().json;
 const c = info.clinic;
-const clean = v => String(v ?? '').replace(/[\u0000-\u001F\u007F]/g, ' ').trim();
+const clean = v => ((v !== null && typeof v === 'object') || typeof v === 'function' ? '' : String(v ?? '')).replace(/[\x00-\x1F\x7F]/g, ' ').trim();
 const esc = v => clean(v).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 
 const name = clean(inp.patient_name).slice(0, 80);
 const contact = clean(inp.contact).slice(0, 120);
 const summary = clean(inp.summary).slice(0, 1000);
 const REASONS = { medical: 'Medical question', reschedule: 'Change or reschedule', complaint: 'Complaint', question: 'Question Sera could not answer', human: 'Asked for a person' };
-const reason = REASONS[clean(inp.reason).toLowerCase()] ? clean(inp.reason).toLowerCase() : 'question';
+const reason = Object.prototype.hasOwnProperty.call(REASONS, clean(inp.reason).toLowerCase()) ? clean(inp.reason).toLowerCase() : 'question';
 
 // The gate is sealed by f0's Prep node, not written by the AI: it caps hand-offs per chat, so nobody can flood reception.
 let gate = {};
 try { gate = JSON.parse(inp.gate || '{}') || {}; } catch (e) { gate = {}; }
+if (gate.handoff_pause === true) {
+  return [{ json: { ready: false, result: { kind: 'hand_off', status: 'not_sent', reason: `Reception has had a lot of chat messages in the last hour, so nothing more can be sent from the chat right now. Ask the patient to call the clinic on ${c.phone}.`,
+    _trace: [{ icon: 'lock', text: 'Clinic-wide hand-off limit reached: nothing sent' }] } } }];
+}
 if (!(gate.handoffs_left > 0)) {
   return [{ json: { ready: false, result: { kind: 'hand_off', status: 'not_sent', reason: 'This chat has already passed questions to reception. Tell the patient reception will reply, or to call the clinic.',
     _trace: [{ icon: 'lock', text: 'Hand-off limit for this chat reached: nothing sent' }] } } }];

@@ -6,7 +6,11 @@
 // 4. Seals the "gate" the tools read: did the patient say yes in THIS message, and how many bookings and
 //    hand-offs this chat has left. The tools get it from this node, never from the AI, so the AI can't fake it.
 // 5. Writes Sera's briefing from d0's facts, including the next 14 days spelled out, so the AI never does date maths.
-const LIMITS = { messagesPerChat: 40, secondsBetween: 2, aiMessagesPerDay: 400, bookingsPerChat: 2, handoffsPerChat: 2, chatsPerDay: 3000 };
+const LIMITS = { messagesPerChat: 40, secondsBetween: 2, aiMessagesPerDay: 400, bookingsPerChat: 2, handoffsPerChat: 2, chatsPerDay: 3000,
+  aiMessagesPerIpPerDay: 60,   // per visitor address, when the server sits behind a proxy or tunnel that says who's calling (see below)
+  handoffsPerHour: 6, handoffsPerDay: 30 };   // clinic-wide: new chat IDs can't get round these
+// The chat ID comes from the browser, so a script can send a new one with every message. The per-chat caps stop a person
+// typing; the clinic-wide caps (here for hand-offs, in d0 for bookings) and the per-address cap stop a script.
 const started = Date.now();                 // for "Done in x s"
 const nowMs = $now.toMillis();              // for rate limits (n8n's clock for this run)
 const raw = $('Chat In').first().json.body;
@@ -14,11 +18,16 @@ let body = raw;
 if (typeof raw === 'string') { try { body = JSON.parse(raw); } catch (e) { body = {}; } }
 if (!body || typeof body !== 'object' || Array.isArray(body)) body = {};
 
-const clean = v => String(v ?? '').replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/g, '').trim();
+// Text only: objects and lists become '' (the body is JSON, so a script can send {"message":{"toString":1}}, and String() would throw).
+const clean = v => ((v !== null && typeof v === 'object') || typeof v === 'function' ? '' : String(v ?? '')).replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, '').trim();
 const MAX = 600;
 let message = clean(body.message);
 const cut = message.length > MAX;
 if (cut) message = message.slice(0, MAX);
+// Who is calling: only a proxy in front of n8n can say. Cloudflare's header first; otherwise the LAST X-Forwarded-For entry,
+// the one our own proxy added (earlier entries are typed by the caller and can be faked). Run straight on a laptop: none.
+const hdr = $('Chat In').first().json.headers || {};
+const ip = clean(hdr['cf-connecting-ip'] || hdr['x-real-ip'] || clean(hdr['x-forwarded-for']).split(',').pop()).slice(0, 64);
 let sessionId = clean(body.sessionId);
 if (!/^[A-Za-z0-9-]{8,64}$/.test(sessionId)) sessionId = 'chat-' + started.toString(36) + '-' + Math.random().toString(36).slice(2, 10);
 
@@ -43,14 +52,14 @@ const EMERGENCY_ROMAN = [
 ];
 const EMERGENCY_URDU = [/سینے\s*میں\s*درد/, /سانس\s*نہیں/, /بے\s*ہوش/, /خودکشی/, /خون\s*(بہت|بند\s*نہیں)/];
 const hit = list => list.some(re => re.test(message));
-const emergencyIn = hit(EMERGENCY_URDU) || /[\u0600-\u06FF]/.test(message) && hit(EMERGENCY_EN) ? 'urdu' : hit(EMERGENCY_ROMAN) ? 'roman' : hit(EMERGENCY_EN) ? 'english' : '';
+const emergencyIn = hit(EMERGENCY_URDU) || /[؀-ۿ]/.test(message) && hit(EMERGENCY_EN) ? 'urdu' : hit(EMERGENCY_ROMAN) ? 'roman' : hit(EMERGENCY_EN) ? 'english' : '';
 const emergency = emergencyIn !== '';
 
 // ---- Which language is this message in? Told to Sera explicitly, so she doesn't drift into English. ----
 const ROMAN_WORDS = /\b(hai|hain|hay|hy|hn|hen|h|ho|hoon|hun|aap|ap|apka|apki|mujhe|mujhay|mujhy|mjhe|mjhy|mera|meri|mra|mri|karein|karen|krein|kren|kar|kr|kya|kia|kiya|kaun|kon|kaunsi|konsi|kab|kb|kahan|kahaan|kdhr|kidhar|kidr|kdr|kal|aaj|aj|shaam|sham|subah|subha|waqt|wqt|time\s*hai|theek|thik|thk|nahi|nahin|nai|nhi|ni|ji|jee|g|bukhar|bkhar|dawai|dwai|dard|drd|loon|lun|lein|len|chahiye|chahye|chaiye|batayein|btayein|btao|bata|sahab|sahib|se|sy|ko|ka|ki|ke|mein|main|me|mai|mn|bhi|bi|abhi|abi|plz|please\s*bata)\b/gi;
 // Short replies ("han", "ji kar dein", "theek hai") carry one strong Roman Urdu word: enough on its own.
 const ROMAN_SHORT = /\b(han|haan|haanji|hanji|ji|jee|theek|thik|thk|bilkul|zaroor|kar\s*do|kr\s*do|kardo|kar\s*dein|kr\s*dein|nahi|nahin|nhi|shukriya|acha|achha|accha|jazakallah)\b/i;
-const lang = /[\u0600-\u06FF]/.test(message) ? 'urdu'
+const lang = /[؀-ۿ]/.test(message) ? 'urdu'
   : (message.match(ROMAN_WORDS) || []).length >= 2 || (message.trim().split(/\s+/).length <= 4 && ROMAN_SHORT.test(message)) ? 'roman' : 'english';
 
 // ---- d0 couldn't be reached (no internet, Google Sheets down): reply politely instead of failing. Emergencies still get 1122. ----
@@ -74,15 +83,24 @@ if (!info.clinic) {
 // ---- Did the patient say yes in this message? English, Roman Urdu, Urdu. Only then can a booking go through. ----
 const AFFIRM = /\b(yes|yeah|yep|yup|ok|okay|sure|g|gee|jii|confirm(ed)?|go ahead|book it|please do|do it|correct|right|haan|han|haanji|ji|jee|theek|thik|kar do|kardo|kar dein|bilkul|zaroor|sahi)\b|ہاں|جی|ٹھیک|کر دیں|بالکل|ضرور/i;
 const NEGATE = /\b(no|nope|not|don'?t|wait|cancel|nahi|nahin|mat|ruk)\b|نہیں|مت/i;
-const affirm = AFFIRM.test(message) && !NEGATE.test(message);
+// A yes only counts as the answer to Sera's own read-back (f0 Reply marks the chat when her reply repeats a time and a doctor
+// and asks). So "yes, book Dr. X at 6 for Y" sent cold, or "the chat must confirm it", can't book anything.
+// It must also be short, or start with the yes: "ok but first tell me the fee" isn't a yes to the booking.
+const STARTS_YES = /^\s*(yes|yeah|yep|yup|ok|okay|sure|confirm(ed)?|go ahead|book it|please do|haan|han|haanji|ji|jee|theek|thik|bilkul|zaroor|sahi)\b|^\s*(ہاں|جی|ٹھیک|بالکل|ضرور)/i;
+const yesWords = AFFIRM.test(message) && !NEGATE.test(message) && (message.split(/\s+/).length <= 8 || STARTS_YES.test(message));
 
 // ---- Per-chat and per-day counters, kept in the workflow's static data (survives between production runs) ----
 const sd = $getWorkflowStaticData('global');
-if (sd.day !== info.today) { sd.day = info.today; sd.ai = 0; sd.chats = {}; }      // a fresh count every day
+if (sd.day !== info.today) { sd.day = info.today; sd.ai = 0; sd.chats = {}; sd.ips = {}; sd.handoffsToday = 0; }      // a fresh count every day
+if (!sd.ips) sd.ips = {};
+const hourNow = $now.setZone('Asia/Karachi').toFormat('yyyy-MM-dd HH');
+if (sd.handoffHour !== hourNow) { sd.handoffHour = hourNow; sd.handoffsThisHour = 0; }
 let chat = sd.chats[sessionId];
 const full = !chat && Object.keys(sd.chats).length >= LIMITS.chatsPerDay;
 if (!chat && !full) chat = sd.chats[sessionId] = { messages: 0, last: 0, bookings: 0, handoffs: 0 };
 
+const affirm = yesWords && !!(chat && chat.awaitingYes);
+const ipFull = ip && (sd.ips[ip] || 0) >= LIMITS.aiMessagesPerIpPerDay;
 let route = 'agent', reply = '';
 const steps = [{ icon: 'rules', text: `Checked today's hours: ${info.open_now ? 'open now' : 'closed now'}` }];
 if (body.hello === true) {
@@ -103,10 +121,10 @@ if (body.hello === true) {
     english: 'This sounds urgent. Please call **1122** (Rescue) right now or go to the nearest emergency department. A chat can\'t help in an emergency.',
   }[emergencyIn];
   steps.push({ icon: 'alert', text: 'Emergency words found: fixed safety reply, AI skipped on purpose' });
-} else if (full || chat.messages >= LIMITS.messagesPerChat) {
+} else if (full || chat.messages >= LIMITS.messagesPerChat || ipFull) {
   route = 'limit';
   reply = `We've covered a lot in this chat. For anything else, please call ${c.phone} or use the booking form: ${c.booking_form_url}`;
-  steps.push({ icon: 'lock', text: full ? 'Too many chats today: AI not called' : `Chat limit reached (${LIMITS.messagesPerChat} messages): AI not called` });
+  steps.push({ icon: 'lock', text: full ? 'Too many chats today: AI not called' : ipFull ? `This address used its ${LIMITS.aiMessagesPerIpPerDay} messages for today: AI not called` : `Chat limit reached (${LIMITS.messagesPerChat} messages): AI not called` });
 } else if (nowMs - chat.last < LIMITS.secondsBetween * 1000) {
   route = 'slow';
   reply = 'One message at a time, please. I\'m still reading the last one.';
@@ -116,10 +134,14 @@ if (body.hello === true) {
   reply = `I'm getting a lot of messages today, so I can't answer right now. Please call ${c.phone} or book with the form: ${c.booking_form_url}`;
   steps.push({ icon: 'lock', text: `Daily AI limit reached (${LIMITS.aiMessagesPerDay}): AI not called` });
 }
-if (route === 'agent') { chat.messages++; sd.ai++; }
+if (route === 'agent') { chat.messages++; sd.ai++; if (ip) sd.ips[ip] = (sd.ips[ip] || 0) + 1; }
 if (chat && route !== 'hello') chat.last = nowMs;
-const gate = JSON.stringify({ affirm, bookings_left: chat ? LIMITS.bookingsPerChat - chat.bookings : 0, handoffs_left: chat ? LIMITS.handoffsPerChat - chat.handoffs : 0 });
-if (route === 'agent' && affirm) steps.push({ icon: 'rules', text: 'Patient said yes in this message: booking allowed' });
+if (chat && route !== 'hello') chat.awaitingYes = false;   // a yes counts once, straight after the read-back; Reply sets it again
+const handoffPause = (sd.handoffsThisHour || 0) >= LIMITS.handoffsPerHour || (sd.handoffsToday || 0) >= LIMITS.handoffsPerDay;
+const gate = JSON.stringify({ affirm, bookings_left: chat ? LIMITS.bookingsPerChat - chat.bookings : 0,
+  handoffs_left: chat && !handoffPause ? LIMITS.handoffsPerChat - chat.handoffs : 0, handoff_pause: handoffPause });
+if (route === 'agent' && affirm) steps.push({ icon: 'rules', text: 'Patient said yes to the read-back: booking allowed' });
+else if (route === 'agent' && yesWords) steps.push({ icon: 'skip', text: 'A yes, but not to a read-back of the booking: booking not allowed yet' });
 
 // ---- A doctor the clinic doesn't have ("Dr. Strange")? Spelled out for Sera, so she always names the real ones. ----
 const realNames = info.doctors.flatMap(d => d.name.toLowerCase().replace(/^dr\.?\s*/, '').split(/\s+/));

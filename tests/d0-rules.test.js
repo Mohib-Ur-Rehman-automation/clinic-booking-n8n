@@ -11,7 +11,7 @@ const appt = (doctor, date, time, x = {}) => ({
 });
 const core = (action, data, { rows = [], closures = [], now = '2026-10-19 09:00' } = {}) =>
   run(RULES, { nowUTC: pkt(now), nodes: { Start: { action, data }, 'Read Appointments': rows.length ? rows : [{}], 'Read Closures': closures.length ? closures : [{}] } });
-const form = (x = {}) => ({ 'Patient name': 'Sara Ahmed', Phone: '0300 1234567', Email: 'sara@example.com', Doctor: UA, 'Visit type': 'Check-up', 'Preferred date': '2026-10-20', ...x });
+const form = (x = {}) => ({ 'Patient name': 'Sara Ahmed', Phone: '0321 9876543', Email: 'sara@example.com', Doctor: UA, 'Visit type': 'Check-up', 'Preferred date': '2026-10-20', ...x });
 const slots = (x, o) => core('slots', form(x), o)[0];
 
 // ---------- slots ----------
@@ -103,8 +103,12 @@ r = slots({ 'Preferred date': '10/20/2026' });
 t('slots: US date from a direct link still works', r.date === '2026-10-20', r.date);
 r = slots({ Doctor: '  dr. usman ALI ' });
 t('slots: doctor matched ignoring case/spaces', r.doctor === UA, r.doctor);
-throws('slots: unknown doctor is a setup error (e0 alert)', () => slots({ Doctor: 'Dr. Nobody' }), /not in CLINIC\.doctors/);
-throws('slots: unknown visit type is a setup error', () => slots({ 'Visit type': 'Surgery' }), /not in CLINIC\.visitTypes/);
+// A doctor or visit type not on the list can only come from an edited page or a script: refused like any bad detail,
+// never a crash (a crash emails you through e0, once per fake submission).
+r = slots({ Doctor: 'Dr. Nobody' });
+t('slots: unknown doctor is refused, not a crash', r.status === 'refused' && r.outcome === 'Invalid details' && r.errors.includes('Choose a doctor from the list.'), r);
+r = slots({ 'Visit type': 'Surgery' });
+t('slots: unknown visit type is refused, not a crash', r.status === 'refused' && r.errors.includes('Choose a visit type from the list.'), r);
 {
   const ids = new Set();
   const rows = [];

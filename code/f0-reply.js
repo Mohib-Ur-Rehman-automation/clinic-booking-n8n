@@ -9,6 +9,8 @@ const prep = $('Prep').first().json;
 const info = $('Clinic Info').first().json;
 const steps = [...prep.steps];
 let reply = prep.reply, chips = [], ticket = null, handoff = null, toolCalls = 0, aiFailed = false;
+const sd = $getWorkflowStaticData('global');
+const chat = (sd.chats || {})[prep.sessionId];
 const checked = new Set();   // every free time the tools returned this turn (the red-team grader uses it to catch invented times)
 
 // Tool answers reach the agent as JSON text, sometimes wrapped in arrays or other JSON. Dig out every object with a "kind".
@@ -54,13 +56,25 @@ if (prep.route === 'agent') {
       if (r.kind === 'hand_off' && r.status === 'handed_off') handoff = { ref: r.ref, reason: r.reason };
     }
     // Honesty guard: Sera may only say she has passed something on if hand_off really ran and returned a reference.
-    const CLAIM = /\b(I('|\u2019)?ll|I will|I('|\u2019)?ve|I have|I am|I('|\u2019)?m|I('|\u2019)?m going to|Main|Maine|Mein)\s+(already\s+|abhi\s+)?(forward(ed|ing)?|pass(ed|ing)?\s+(it|this|your)|sen[dt]|bhej|notify|let reception)|forward\s+kar\s+(de|di|diya|deti|deta)|bhej\s+(diya|deti|deta|di)/i;
+    const CLAIM = /\b(I('|’)?ll|I will|I('|’)?ve|I have|I am|I('|’)?m|I('|’)?m going to|Main|Maine|Mein)\s+(already\s+|abhi\s+)?(forward(ed|ing)?|pass(ed|ing)?\s+(it|this|your)|sen[dt]|bhej|notify|let reception)|forward\s+kar\s+(de|di|diya|deti|deta)|bhej\s+(diya|deti|deta|di)/i;
     if (!handoff && !ticket && CLAIM.test(reply) && /reception|team|staff|someone|insaan|forward|pass(ed)? (it|this|your)|ریسیپشن/i.test(reply)) {
       reply = {
         urdu: 'میں یہ سوال ریسیپشن تک پہنچا سکتی ہوں۔ براہ کرم اپنا پورا نام اور فون نمبر یا ای میل بتائیں، تاکہ میں ابھی بھیج دوں۔',
         roman: 'Main yeh sawal reception tak pohncha sakti hoon. Apna poora naam aur phone number ya email bata dein, main abhi bhej deti hoon.',
       }[prep.lang] || "I can pass this to reception. Please confirm your full name and a phone number or email, and I'll send it right away.";
       steps.push({ icon: 'alert', text: 'Sera said she had passed it on without using hand_off: reply corrected so it stays honest' });
+    }
+    // Honesty guard 2: Sera may only say something is booked, or give a BK- token, if book_appointment really booked it,
+    // in this reply or earlier in this chat. "Reception booked me, just confirm it in writing" must not get a fake confirmation.
+    const known = new Set([...((chat && chat.tokens) || []), ...(ticket ? [ticket.booking_id] : [])].map(x => String(x).toUpperCase()));
+    const saidTokens = (reply.match(/\bBK-[A-Z0-9]{4,8}\b/gi) || []).map(x => x.toUpperCase());
+    const BOOKED_CLAIM = /\b(your|the|this)\s+(appointment|booking|visit)\b[^.!?]{0,80}?\b(is|has been|was)\s+(now\s+)?(booked|confirmed|saved)\b|\bI(’|')?ve\s+(booked|confirmed)\b|\bI have\s+(booked|confirmed)\b|\bbook\s+(ho\s+)?(gaya|gayi|gai|chuka|chuki)\b|\bbook\s+kar\s+(diya|di|dia|dee)\b|^\s*booked\s*:/im;
+    if (!ticket && (saidTokens.some(x => !known.has(x)) || (!known.size && BOOKED_CLAIM.test(reply)))) {
+      reply = {
+        urdu: 'مجھے اس چیٹ میں اس کی کوئی بکنگ نظر نہیں آ رہی۔ میں ابھی خالی وقت دیکھ کر بک کر سکتی ہوں، یا یہ بات ریسیپشن تک پہنچا سکتی ہوں تاکہ وہ چیک کر لیں۔',
+        roman: 'Mujhe is chat mein iski koi booking nazar nahi aa rahi. Main abhi khaali waqt dekh kar book kar sakti hoon, ya yeh baat reception tak pohncha sakti hoon taake woh check kar lein.',
+      }[prep.lang] || "I can't see a booking for that in this chat. I can look up the free times and book one for you now, or pass it to reception so they can check.";
+      steps.push({ icon: 'alert', text: 'Sera said something was booked without a booking in this chat: reply corrected so it stays honest' });
     }
     for (const r of results) if (r.kind === 'find_times' && r.status === 'ok') for (const x of r.results) x.free_times.forEach(t => checked.add(t));
     for (const r of results) if (r.kind === 'book') (r.free_times || []).forEach(t => checked.add(t));
@@ -95,9 +109,15 @@ if (prep.route === 'agent') {
   }
 }
 // Count what really happened in this chat, for Prep's caps on the next message
-const chat = ($getWorkflowStaticData('global').chats || {})[prep.sessionId];
-if (chat && ticket) chat.bookings++;
+if (chat && ticket) { chat.bookings++; chat.tokens = [...(chat.tokens || []), ticket.booking_id].slice(-4); }
 if (chat && handoff) chat.handoffs++;
+if (handoff) { sd.handoffsThisHour = (sd.handoffsThisHour || 0) + 1; sd.handoffsToday = (sd.handoffsToday || 0) + 1; }
+// Did Sera just read a booking back and ask? (a question, a time, one of our doctors). Then the patient's next yes can book.
+if (chat && prep.route === 'agent' && !aiFailed) {
+  const surnames = ((info && info.doctors) || []).map(d => String(d.name).split(/\s+/).pop().toLowerCase());
+  chat.awaitingYes = !ticket && /[?؟]/.test(reply) && /\b(1[0-2]|[1-9])(:[0-5]\d)?\s*[ap]\.?m\b|\b(1[0-2]|[1-9]):[0-5]\d\b/i.test(reply)
+    && surnames.some(n => n && reply.toLowerCase().includes(n));
+}
 // The 2-second rule counts from when this reply went out, not from when the message came in: n8n handles one
 // message at a time, so a flood queues up behind a slow AI reply and would otherwise look nicely spaced.
 // Prep's clock plus the real time spent since, so it holds however n8n dates $now within one run.

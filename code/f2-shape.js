@@ -6,7 +6,7 @@
 // or no bookings left in this chat, means no booking, whatever the AI was talked into. No gate at all also means no.
 const inp = $('Start').first().json;
 const a = $('Check Time').first().json;
-const clean = v => String(v ?? '').trim();
+const clean = v => (v !== null && typeof v === 'object') || typeof v === 'function' ? '' : String(v ?? '').trim();   // objects from the AI become ''
 const key = v => clean(v).toLowerCase().replace(/[^a-z0-9]/g, '');
 const pad = n => String(n).padStart(2, '0');
 const label = t => { const h = Number(t.slice(0, 2)); return (h % 12 || 12) + ':' + t.slice(3, 5) + (h >= 12 ? ' PM' : ' AM'); };
@@ -42,7 +42,7 @@ if (a.status !== 'ok' || a.results.length !== 1) return fail('Choose one doctor 
 const nameParts = clean(inp.patient_name).split(/\s+/).filter(w => /\p{L}{2,}/u.test(w));
 if (nameParts.length < 2) return fail('Ask for the patient\'s full name (first and last name) before booking.', { missing: ['full name'] });
 // Caps: a person is the mobile number plus the name. Family members sharing a phone each get their own visits.
-const nameKey = v => clean(v).toLowerCase().replace(/[^a-z\u0600-\u06ff]+/g, ' ').trim();
+const nameKey = v => clean(v).toLowerCase().replace(/[^a-z؀-ۿ]+/g, ' ').trim();
 const mine = (a.phone_upcoming_names || []).filter(n => n === nameKey(inp.patient_name)).length;
 if (mine >= a.max_upcoming) {
   return fail(`${clean(inp.patient_name)} already has ${mine} upcoming visits booked, the most the chat can book for one person. Reception can help with more.`, { needs: 'reception' });

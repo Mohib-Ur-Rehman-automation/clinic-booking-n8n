@@ -192,11 +192,14 @@ const book = (x = {}) => ({ patient_name: 'Sara Ahmed', phone: '0300 1234567', e
 }
 
 // ---------- f0 · Prep ----------
-const prep = (body, now = '2026-10-19 11:00', closures = []) => {
+const prep = (body, now = '2026-10-19 11:00', closures = [], staticData = {}) => {
   const sheet = makeSheet(); sheet.tabs.Closures.push(...closures);
   const info = core(sheet, 'info', {}, now)[0];
-  return { p: run(PREP, { nowUTC: pkt(now), nodes: { 'Chat In': { body }, 'Clinic Info': info } })[0], info };
+  return { p: run(PREP, { nowUTC: pkt(now), staticData, nodes: { 'Chat In': { body }, 'Clinic Info': info } })[0], info };
 };
+// A chat where Sera has just read a booking back and asked (f0 Reply sets awaitingYes): the next yes can book.
+const readBack = (sid, now = '2026-10-19 11:00') => ({ day: core(makeSheet(), 'info', {}, now)[0].today, ai: 1, ips: {},
+  chats: { [sid]: { messages: 1, last: 0, bookings: 0, handoffs: 0, awaitingYes: true } } });
 {
   let { p } = prep({ sessionId: 'web-abc12345', hello: true });
   t('prep: page opened in hours -> greeting, no AI, open status', p.route === 'hello' && /I'm Sera/.test(p.reply) && p.status_label === 'Open until 2:00 PM' && p.open_now === true, p);
@@ -396,7 +399,8 @@ const step = (tool, obj, wrap = x => JSON.stringify([x])) => ({ action: { tool, 
   const one = f2(sheet, smtp, book({ time: '1:00 PM', patient_name: 'Sara', phone: '0311 1111111' })).result;
   t('full name: a first name alone is not enough', one.status === 'not_booked' && /full name/.test(one.reason), one);
   for (const m of ['g', 'G', 'jii', 'g kar dein']) {
-    const pg = prep({ sessionId: 'web-g' + Math.random().toString(36).slice(2, 9), message: m }).p;
+    const sid = 'web-g' + Math.random().toString(36).slice(2, 9);
+    const pg = prep({ sessionId: sid, message: m }, undefined, [], readBack(sid)).p;
     t(`affirm: "${m}" counts as yes`, JSON.parse(pg.gate).affirm === true, pg.gate);
   }
 }
@@ -409,10 +413,11 @@ const step = (tool, obj, wrap = x => JSON.stringify([x])) => ({ action: { tool, 
     const p = run(PREP, { nowUTC: pkt(now), staticData: sd, nodes: { 'Chat In': { body }, 'Clinic Info': info } })[0];
     return p;
   };
-  let p = send({ sessionId: 'web-limit0001', message: 'yes please book it' }, '2026-10-19 11:00');
+  const afterReadBack = (sid, m) => { send({ sessionId: sid, message: 'Dr. Usman Ali at 5:20 PM, please' }, '2026-10-19 10:58'); sd.chats[sid].awaitingYes = true; return send({ sessionId: sid, message: m }, '2026-10-19 11:00'); };
+  let p = afterReadBack('web-limit0001', 'yes please book it');
   t('affirm: "yes please book it" opens the gate', JSON.parse(p.gate).affirm === true && p.steps.some(x => /said yes/.test(x.text)), p.gate);
   for (const [m, want] of [['haan kar dein', true], ['ji bilkul', true], ['ہاں ٹھیک ہے', true], ['ok', true], ['no wait', false], ['yes but not 5:20', false], ['what times are free?', false], ['nahi abhi nahi', false]]) {
-    p = send({ sessionId: 'web-aff' + Math.random().toString(36).slice(2, 8), message: m }, '2026-10-19 11:00');
+    p = afterReadBack('web-aff' + Math.random().toString(36).slice(2, 8), m);
     t(`affirm: "${m}" -> ${want}`, JSON.parse(p.gate).affirm === want, p.gate);
   }
   p = send({ sessionId: 'web-limit0001', message: 'hi again' }, '2026-10-19 11:00');

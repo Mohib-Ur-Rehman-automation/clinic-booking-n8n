@@ -14,7 +14,10 @@ const CLINIC = {
   minNoticeMinutes: 60,          // online booking closes this long before a slot
   cancelCutoffMinutes: 120,      // online cancelling closes this long before a slot
   reminderHour: 8,               // d3 sends reminders at this hour; keep it the same as d3's "Every Morning 8 AM" trigger
-  maxUpcomingPerPatient: 2,      // the website chat books at most this many upcoming visits per person (mobile number + name)
+  maxUpcomingPerPatient: 2,      // online booking (form and chat) allows at most this many upcoming visits per person (mobile number + name)
+  maxUpcomingPerPhone: 4,        // ... and this many in all on one mobile number (a family sharing a phone)
+  maxOnlineBookingsPerHour: 10,  // all online bookings together, any patient: above this, online booking pauses and asks people to call
+  maxOnlineBookingsPerDay: 40,   // same, per calendar day. Stops a script from filling the whole calendar
   bookingFormUrl: 'http://localhost:5678/form/clinic-booking',
   cancelFormUrl: 'http://localhost:5678/form/clinic-cancel',
   fromEmail: 'Demo Family Clinic <you@example.com>',
@@ -31,7 +34,8 @@ const ID_CHARS = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';  // no 0/O, 1/I/L
 // ============ 2. HELPERS ============
 const DAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-const clean = v => String(v ?? '').trim();
+// Text only: an object or list (a script can post JSON) becomes '', so String() can never throw on it.
+const clean = v => (v !== null && typeof v === 'object') || typeof v === 'function' ? '' : String(v ?? '').trim();
 const pad = n => String(n).padStart(2, '0');
 const toMin = t => Number(t.slice(0, 2)) * 60 + Number(t.slice(3, 5));
 const toTime = m => pad(Math.floor(m / 60)) + ':' + pad(m % 60);
@@ -86,15 +90,16 @@ function normPhone(v) {
 const EMAIL_RE = /^[^\s@<>()",;]+@[^\s@<>()",;]+\.[A-Za-z]{2,}$/;
 // "sara ahmed" / "SARA AHMED" -> "Sara Ahmed"; mixed case ("McDonald") is kept as typed.
 function normName(v) {
-  let s = clean(v).replace(/[\u0000-\u001F]/g, '').replace(/\s+/g, ' ').slice(0, 80);
+  let s = clean(v).replace(/[\x00-\x1F]/g, '').replace(/\s+/g, ' ').slice(0, 80);
   if (s && (s === s.toLowerCase() || s === s.toUpperCase())) {
     s = s.toLowerCase().replace(/(^|[\s'’.-])(\p{L})/gu, (_, a, b) => a + b.toUpperCase());
   }
   return s;
 }
 const key = v => clean(v).toLowerCase().replace(/\./g, '').replace(/\s+/g, ' ');   // "dr usman  ali" = "Dr. Usman Ali"
-const DOCTOR_BY_KEY = Object.fromEntries(Object.keys(CLINIC.doctors).map(n => [key(n), n]));
-const VISIT_BY_KEY = Object.fromEntries(CLINIC.visitTypes.map(n => [key(n), n]));
+// No prototype, so "constructor" or "__proto__" posted as a doctor or visit type finds nothing instead of a built-in.
+const DOCTOR_BY_KEY = Object.assign(Object.create(null), Object.fromEntries(Object.keys(CLINIC.doctors).map(n => [key(n), n])));
+const VISIT_BY_KEY = Object.assign(Object.create(null), Object.fromEntries(CLINIC.visitTypes.map(n => [key(n), n])));
 const isCancelled = s => ['cancelled', 'canceled'].includes(key(s));
 
 // Every bookable start time in a day: 10:00, 10:20 ... 13:40, 17:00 ... 20:40
@@ -175,6 +180,30 @@ function noTimesWhy(doctor, date) {
   if (date === TODAY && !SLOTS.some(t => bookableNow(date, t))) return `online booking for today has closed (it closes ${CLINIC.minNoticeMinutes} minutes before each time)`;
   return `${doctor} is fully booked on ${dateLabel(date)}`;
 }
+// ---- Caps on online booking, read from the sheet, so the form and the chat share them and every run sees the same count ----
+// A script can't get round these by opening new chats or new form tabs: the count is of rows already booked.
+const stampMin = s => { const m = clean(s).match(/^(\d{4}-\d{2}-\d{2}) (\d{2}):(\d{2})/); return m ? daysBetween('2000-01-01', m[1]) * 1440 + Number(m[2]) * 60 + Number(m[3]) : null; };
+const NOW_ABS = stampMin(nowStr);
+const nameKey = v => clean(v).toLowerCase().replace(/[^a-z؀-ۿ]+/g, ' ').trim();
+function capWhy(patient) {
+  const booked = appts.map(a => ({ at: stampMin(a.booked_at), day: clean(a.booked_at).slice(0, 10) }));
+  const lastHour = booked.filter(b => b.at !== null && b.at <= NOW_ABS && NOW_ABS - b.at < 60).length;
+  const today = booked.filter(b => b.day === TODAY).length;
+  if (lastHour >= CLINIC.maxOnlineBookingsPerHour || today >= CLINIC.maxOnlineBookingsPerDay) {
+    return { outcome: 'Busy', reason: `Online booking is very busy right now, so it is paused for a while. Please call ${CLINIC.phone} and the front desk will book you in.` };
+  }
+  const phone = normPhone(patient && patient.phone);
+  if (!phone) return null;
+  const onPhone = appts.filter(x => !x.cancelled && x.date && x.date >= TODAY && normPhone(x.phone) === phone);
+  const same = onPhone.filter(x => nameKey(x.patient_name) === nameKey(patient.name)).length;
+  if (same >= CLINIC.maxUpcomingPerPatient) {
+    return { outcome: 'Limit reached', reason: `${clean(patient.name)} already has ${same} upcoming visits booked, the most that can be booked online for one person. Please call ${CLINIC.phone} to book more.` };
+  }
+  if (onPhone.length >= CLINIC.maxUpcomingPerPhone) {
+    return { outcome: 'Limit reached', reason: `This mobile number already has ${onPhone.length} upcoming visits booked, the most that can be booked online for one number. Please call ${CLINIC.phone} to book more.` };
+  }
+  return null;
+}
 function newBookingId() {
   const used = new Set(appts.map(a => a.booking_id));
   for (;;) {
@@ -185,8 +214,8 @@ function newBookingId() {
 }
 const publicClinic = { name: CLINIC.name, phone: CLINIC.phone, hours: HOURS_TEXT, booking_form_url: CLINIC.bookingFormUrl, from: CLINIC.fromEmail, admin: CLINIC.adminEmail,
   timezone: CLINIC.timezone, slot_minutes: CLINIC.slotMinutes, max_days: CLINIC.maxDaysAhead, min_notice_minutes: CLINIC.minNoticeMinutes, cancel_cutoff_hours: CLINIC.cancelCutoffMinutes / 60,
-  reminder_time: timeLabel(toTime(CLINIC.reminderHour * 60)).replace(':00 ', '\u00a0') };   // "8 AM" with a no-break space, so it never splits across lines
-const specialty = d => (CLINIC.doctors[d] && CLINIC.doctors[d].specialty) || '';
+  reminder_time: timeLabel(toTime(CLINIC.reminderHour * 60)).replace(':00 ', '\xA0') };   // "8 AM" with a no-break space, so it never splits across lines
+const specialty = d => (Object.prototype.hasOwnProperty.call(CLINIC.doctors, d) && CLINIC.doctors[d].specialty) || '';
 const cancelLink = (id, token) => `${CLINIC.cancelFormUrl}?id=${encodeURIComponent(id)}&t=${encodeURIComponent(token)}`;
 const out = j => ({ json: { action, now: STAMP, clinic: publicClinic, ...j } });
 
@@ -195,11 +224,13 @@ if (action === 'slots') {
   const f = data;
   const doctor = DOCTOR_BY_KEY[key(f['Doctor'])];
   const visit = VISIT_BY_KEY[key(f['Visit type'])];
-  if (!doctor) throw new Error(`Doctor "${clean(f['Doctor'])}" is not in CLINIC.doctors. The form dropdown and d0 must match exactly.`);
-  if (!visit) throw new Error(`Visit type "${clean(f['Visit type'])}" is not in CLINIC.visitTypes. The form dropdown and d0 must match exactly.`);
   const patient = { name: normName(f['Patient name']), phone: normPhone(f['Phone']), email: clean(f['Email']).toLowerCase() };
   const asked = normDate(f['Preferred date']);
   const errors = [];
+  // A doctor or visit type that isn't on the form's list can only come from an edited page or a script: refuse it like any
+  // other bad detail. Throwing here would fail the run and email you through e0 once per fake submission.
+  if (!doctor) errors.push('Choose a doctor from the list.');
+  if (!visit) errors.push('Choose a visit type from the list.');
   if (patient.name.replace(/[^\p{L}]/gu, '').length < 2) errors.push("Enter the patient's full name.");
   if (!patient.phone) errors.push('Enter a Pakistani mobile number, like 0300 1234567.');
   if (!EMAIL_RE.test(patient.email)) errors.push('Enter a valid email address. Your confirmation goes there.');
@@ -214,6 +245,8 @@ if (action === 'slots') {
     return [out({ ...base, status: 'refused', outcome: 'Too far ahead',
       reason: `Online booking is open up to ${CLINIC.maxDaysAhead} days ahead, so the latest date you can choose is ${dateLabel(LAST_DAY)}.` })];
   }
+  const cap = capWhy(patient);
+  if (cap) return [out({ ...base, status: 'refused', ...cap })];
   let date = asked < TODAY ? TODAY : asked;
   let times = freeTimes(doctor, date);
   let note = '';
@@ -254,6 +287,8 @@ if (action === 'check') {
   const time = normTime(chosen);
   if (!time || !SLOTS.includes(time)) return [out({ ...base, status: 'stop', outcome: 'Invalid details', reason: `"${chosen}" is not one of the clinic's times.` })];
   const when = whenLabel(r.date, time);
+  const cap = capWhy(r.patient);                // checked again: others may have booked while this page sat open
+  if (cap) return [out({ ...base, status: 'stop', ...cap, time, when })];
   if (!freeTimes(r.doctor, r.date).includes(time)) {
     let outcome = 'Taken before submit', reason = `Someone else booked ${when} while you were choosing.`;
     if (closedWhy(r.doctor, r.date)) { outcome = 'No free time'; reason = closedWhy(r.doctor, r.date)[0].toUpperCase() + closedWhy(r.doctor, r.date).slice(1) + '.'; }
@@ -418,10 +453,9 @@ if (action === 'availability') {
     // Email isn't used: families share it even more.
     const phone = normPhone(data.phone);
     const onPhone = phone ? appts.filter(x => !x.cancelled && x.date && x.date >= TODAY && normPhone(x.phone) === phone) : [];
-    const nameKey = v => clean(v).toLowerCase().replace(/[^a-z\u0600-\u06ff]+/g, ' ').trim();
     return [out({ status: 'ok', asked_date: asked, results, visit_types: CLINIC.visitTypes,
       phone_upcoming: onPhone.length, phone_upcoming_names: onPhone.map(x => nameKey(x.patient_name)),
-      max_upcoming: CLINIC.maxUpcomingPerPatient, max_per_phone: CLINIC.maxUpcomingPerPhone || 4 })];
+      max_upcoming: CLINIC.maxUpcomingPerPatient, max_per_phone: CLINIC.maxUpcomingPerPhone })];
   };
   if (!anyDoctor && !doctor) {
     // Whole words only: "usman", "doctor usman", "Dr. Ali" find one doctor; "a" or "ali khan" (two doctors' words) find none.
