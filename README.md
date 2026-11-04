@@ -4,7 +4,7 @@
   <img src="https://img.shields.io/badge/n8n-2.43.7_self--hosted-0F766E?style=flat-square" alt="n8n 2.43.7 self-hosted">
   <img src="https://img.shields.io/badge/data-Google_Sheets-FF8B5A?style=flat-square" alt="Google Sheets">
   <img src="https://img.shields.io/badge/email-Gmail_SMTP-6B8F7A?style=flat-square" alt="Gmail SMTP">
-  <img src="https://img.shields.io/badge/tests-25%2C603_checks_passing-0F172A?style=flat-square" alt="25,603 checks passing">
+  <img src="https://img.shields.io/badge/tests-25%2C638_checks_passing-0F172A?style=flat-square" alt="25,638 checks passing">
   <img src="https://img.shields.io/badge/running_cost-free-FFE2C2?style=flat-square&labelColor=0F766E" alt="Free to run">
 </p>
 
@@ -110,7 +110,7 @@ Node-by-node notes for each workflow are in [`workflows/README.md`](workflows/RE
 | Suite | Checks | What it covers |
 |---|---:|---|
 | `d0-rules.test.js` | 125 | Every action's decisions: free times, closures, notice and booking windows, reminder timing, clashes, the sheet health check, cancel lookups |
-| `d0-templates.test.js` | 52 | Every page and email: wording, escaping, calendar links, form blocks surviving n8n's HTML sanitiser |
+| `d0-templates.test.js` | 55 | Every page and email: wording, escaping, calendar links, form blocks surviving n8n's HTML sanitiser |
 | `flows.test.js` | 41 | Whole workflows step by step against an in-memory sheet and mail server: races, retries, failed emails, two-tab cancels |
 | `e0.test.js` | 10 | Alert labels and the *Check first* hints |
 | `stress.test.js` | 24,809 | 4,000 hostile form submissions, 1,500 garbage sheets, date edge cases (New Year, leap day, exact cut-offs), and a seeded 60-day simulation with 263 bookings, checking that no time is ever double-booked, nobody gets two reminders, and every booked page's reminder promise is kept |
@@ -310,7 +310,7 @@ d0 gained two read-only actions for this: `info` (open now? next opening, the ne
 | Suite | Checks | What it covers |
 |---|---:|---|
 | `d0-frontdesk.test.js` | 340 | `info` (open or closed at every hour, next opening, closures) and `availability` (doctor names, dates, moves, full days), plus 2,000 random requests that must never crash d0 or offer a taken time |
-| `frontdesk-flows.test.js` | 181 | f1, f2 and f3 end to end against an in-memory sheet and mail server (races, retries, refused details, failed emails, escaping), Prep (emergencies in three languages, odd bodies, every limit), the sealed gate (no yes, no gate, forged gate, caps), Reply (time buttons, token slip, hand-offs, AI failures) and the page script |
+| `frontdesk-flows.test.js` | 183 | f1, f2 and f3 end to end against an in-memory sheet and mail server (races, retries, refused details, failed emails, escaping), Prep (emergencies in three languages, odd bodies, every limit), the sealed gate (no yes, no gate, forged gate, caps), Reply (time buttons, token slip, hand-offs, AI failures) and the page script |
 
 | `redteam.test.js` | 45 | The red-team grader itself: fed fake replies that leak instructions, give doses (English and Urdu word order), invent times or phone numbers, answer in the wrong language or book when they mustn't, it must catch each one and pass the clean ones |
 

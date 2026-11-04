@@ -6,7 +6,7 @@
 // ============ LOOK: Tropical Teal & Apricot ============
 const C = {
   teal: '#0F766E',      // headings, time, main buttons (white on it 5.5:1)
-  apricot: '#FF8B5A',   // token highlight, calendar button: always with Midnight text (6.9:1), never as text
+  apricot: '#FF8B5A',   // "Book an appointment" button and logo dot: always with Midnight text (6.9:1), never as text
   peach: '#FFE2C2',     // Peach Cream: background shapes
   paper: '#FFF6EC',     // page background (lighter Peach Cream, so the shapes stand out)
   slip: '#FFF1E4',      // appointment slip
@@ -61,6 +61,21 @@ const LOGO_SVG = `<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 40 40' ar
 
 const esc = v => String(v ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
 const phoneShow = p => /^03\d{9}$/.test(String(p)) ? String(p).slice(0, 4) + '-' + String(p).slice(4) : String(p ?? '');
+// Tappable numbers in emails: 0322-4448899 -> tel:+923224448899, (042) 000-0000 -> tel:+92420000000
+const telLink = ph => {
+  const d = String(ph ?? '').replace(/[^\d+]/g, '');
+  const href = /^0\d{9,10}$/.test(d) ? 'tel:+92' + d.slice(1) : d ? 'tel:' + d : '';
+  return href ? `<a href="${href}" style="color:${C.teal};text-decoration:none;white-space:nowrap">${esc(phoneShow(ph))}</a>` : esc(phoneShow(ph));
+};
+// "2026-10-26 08:00 PKT" -> "8:00 AM, Monday 26 Oct"
+const stampLabel = st => {
+  const m = String(st ?? '').match(/^(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2})/);
+  if (!m) return String(st ?? '');
+  const day = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'][new Date(Date.UTC(+m[1], +m[2] - 1, +m[3])).getUTCDay()];
+  const mon = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'][+m[2] - 1];
+  return `${+m[4] % 12 || 12}:${m[5]} ${+m[4] >= 12 ? 'PM' : 'AM'}, ${day} ${+m[3]} ${mon}`;
+};
+const MOBILE_RE = /\b03\d{9}\b/g;
 // Emails greet by the first word of the name only if it looks like a name. Anything else ("claim-refund.com Khan") would
 // put a stranger's text, often a link, into a clinic email sent to whatever address was typed. Then it's "Hi there".
 const firstName = n => { const w = String(n ?? '').trim().split(/\s+/)[0] || ''; return /^\p{L}[\p{L}'’-]{0,23}$/u.test(w) ? w : 'there'; };
@@ -110,6 +125,7 @@ function page(j, { title, lead = '', body = '', button = null, aside = '', step 
 .dc-steps li.done{border-top-color:${C.eucalyptus}}
 .dc-steps li.done::before{content:'\\2713  '}
 .dc-steps li.now{border-top-color:${C.teal};color:${C.ink};font-weight:700}
+.dc-steps li.done:last-child{border-top-color:${C.teal};color:${C.ink};font-weight:700}
 .dc-grid{display:grid;gap:16px}
 .dc-card,.dc-side{background:#fff;border:1px solid ${C.line};border-radius:16px;padding:28px 24px;box-shadow:0 18px 40px -18px rgba(15,23,42,.25)}
 .dc-side{background:rgba(255,255,255,.88);padding:22px 22px}
@@ -122,7 +138,7 @@ function page(j, { title, lead = '', body = '', button = null, aside = '', step 
 .dc-slip table{border-collapse:collapse;width:100%;font-size:15px}
 .dc-slip td{padding:3px 0;vertical-align:top}
 .dc-slip td:first-child{color:${C.muted};width:92px}
-.dc-token{background:${C.apricot};color:${C.ink};padding:2px 8px;border-radius:6px;font-weight:800;letter-spacing:1px}
+.dc-token{border:1.5px solid ${C.teal};color:${C.ink};padding:1px 7px;border-radius:6px;font-family:Consolas,'Courier New',monospace;font-weight:700;letter-spacing:1px}
 .dc-gone .dc-time,.dc-gone .dc-date{text-decoration:line-through;color:${C.muted}}
 .dc p{margin:0 0 12px}
 .dc ul{margin:0 0 12px;padding-left:20px}
@@ -190,7 +206,7 @@ function mail(j, { preheader, title, body }) {
 <div style="font-size:23px;line-height:1.25;font-weight:bold;color:${C.teal};margin:0 0 12px">${esc(title)}</div>
 ${body}
 </td></tr>
-<tr><td style="padding:14px 4px;font-family:${FONT_MAIL};font-size:12px;color:${C.muted}">${esc(j.clinic.name)} &nbsp; Questions? Call ${esc(j.clinic.phone)}.</td></tr>
+<tr><td style="padding:14px 4px;font-family:${FONT_MAIL};font-size:12px;color:${C.muted}">${esc(j.clinic.name)} &nbsp; Questions? Call ${telLink(j.clinic.phone)}.</td></tr>
 </table></td></tr></table></body></html>`;
 }
 function slipMail(s, gone = false) {
@@ -203,7 +219,7 @@ function slipMail(s, gone = false) {
 <table role="presentation" cellpadding="0" cellspacing="0" width="100%">
 ${row('Doctor', esc(s.doctor))}
 ${s.visit_type ? row('Visit', esc(s.visit_type)) : ''}
-${row('Token', `<span style="background:${C.apricot};color:${C.ink};padding:2px 8px;border-radius:6px;font-weight:bold;letter-spacing:1px">${esc(s.booking_id)}</span>`)}
+${row('Token', `<span style="border:1px solid ${C.teal};color:${C.ink};padding:1px 7px;border-radius:6px;font-family:Consolas,'Courier New',monospace;font-weight:bold;letter-spacing:1px">${esc(s.booking_id)}</span>`)}
 </table></td></tr></table>`;
 }
 const p = t => `<p style="margin:0 0 12px">${t}</p>`;
@@ -249,15 +265,15 @@ for (const item of $input.all()) {
         (reminderLine ? `<li>${esc(reminderLine)}</li>` : '') +
         `<li>Arrive 10 minutes early. Bring any previous prescriptions or reports.</li>` +
         `<li>Can't make it? <a href="${esc(j.cancel_link)}">Cancel online</a> up to ${j.clinic.cancel_cutoff_hours} hours before, so another patient can have the time.</li></ol>` +
-        `<a class="dc-btn warm" href="${esc(cal)}" target="_blank" rel="noopener">Add to Google Calendar</a>`;
-      j.page_html = page(j, { step: 3, title: "You're booked", lead: `A confirmation is on its way to ${esc(j.patient.email)}.`, body: slipPage(slip), aside });
-      j.page_html_email_failed = page(j, { step: 3, title: "You're booked", lead: 'Your appointment is saved.', aside,
+        `<a class="dc-btn" href="${esc(cal)}" target="_blank" rel="noopener">Add to Google Calendar</a>`;
+      j.page_html = page(j, { step: 4, title: "You're booked", lead: `A confirmation is on its way to ${esc(j.patient.email)}.`, body: slipPage(slip), aside });
+      j.page_html_email_failed = page(j, { step: 4, title: "You're booked", lead: 'Your appointment is saved.', aside,
         body: slipPage(slip) + `<div class="dc-note">We couldn't send the confirmation email to ${esc(j.patient.email)}. Please take a screenshot of this page or note your token.</div>` });
       j.email = {
         from: j.clinic.from, to: j.patient.email,
         subject: `Booked: ${j.when} with ${j.doctor}`,
         html: mail(j, { preheader: `Your token is ${j.booking_id}. Please arrive 10 minutes early.`, title: `You're booked, ${firstName(j.patient.name)}`,
-          body: slipMail(slip) + p('Please arrive 10 minutes early and bring any previous prescriptions or reports.') + mailBtn(cal, 'Add to Google Calendar', 'warm') +
+          body: slipMail(slip) + p('Please arrive 10 minutes early and bring any previous prescriptions or reports.') + mailBtn(cal, 'Add to Google Calendar') +
             `<p style="margin:10px 0 8px">Can't make it? Cancelling frees the time for another patient. You can cancel online up to ${j.clinic.cancel_cutoff_hours} hours before.</p>` + mailBtn(j.cancel_link, 'Cancel this appointment', 'quiet') }),
         text: `Hi ${firstName(j.patient.name)},\n\nYour appointment is booked.\n\n${textSlip(slip)}\n\nPlease arrive 10 minutes early.\nAdd to Google Calendar: ${cal}\nCan't make it? Cancel online up to ${j.clinic.cancel_cutoff_hours} hours before: ${j.cancel_link}` + textFoot(j),
       };
@@ -292,7 +308,7 @@ for (const item of $input.all()) {
     const td = 'padding:9px 12px 9px 0;border-bottom:1px solid ' + C.line + ';font-family:' + FONT_MAIL + ';font-size:14px;vertical-align:top';
     const th = td + ';color:' + C.muted + ';font-size:12px;font-weight:normal;text-align:left';
     const table = n ? `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:6px 0 16px"><tr><th style="${th}">Time</th><th style="${th}">Patient</th><th style="${th}">Visit</th><th style="${th}">Phone</th></tr>` +
-      j.appointments.map(a => `<tr><td style="${td};white-space:nowrap;color:${C.teal};font-weight:bold">${esc(a.time_label)}</td><td style="${td}">${esc(a.patient_name)}</td><td style="${td}">${esc(a.visit_type)}</td><td style="${td};white-space:nowrap">${esc(phoneShow(a.phone))}</td></tr>`).join('') + '</table>'
+      j.appointments.map(a => `<tr><td style="${td};white-space:nowrap;color:${C.teal};font-weight:bold">${esc(a.time_label)}</td><td style="${td}">${esc(a.patient_name)}</td><td style="${td}">${esc(a.visit_type)}</td><td style="${td};white-space:nowrap">${telLink(a.phone)}</td></tr>`).join('') + '</table>'
       : p('No appointments are booked for today.');
     const closedNote = j.closed ? `<div style="background:${C.alertBg};border-left:4px solid ${C.alert};padding:10px 14px;margin:0 0 14px">The sheet says ${esc(j.closed)}. ${n ? 'Reception has been asked to contact these patients.' : ''}</div>` : '';
     j.email = {
@@ -314,10 +330,10 @@ for (const item of $input.all()) {
       from: j.clinic.from, to: j.clinic.admin,
       subject: `Clinic sheet needs attention: ${n} issue${n === 1 ? '' : 's'}`,
       html: mail(j, { preheader: j.problems[0], title: `${n} thing${n === 1 ? '' : 's'} to fix in the clinic sheet`,
-        body: p(`Found by ${esc(j.source)} at ${esc(j.now)}. Everything else went out as normal.`) +
-          '<ol style="margin:0 0 14px;padding-left:20px">' + j.problems.map(x => `<li style="margin:0 0 8px">${esc(x)}</li>`).join('') + '</ol>' +
+        body: p(`Found at ${esc(stampLabel(j.now))}. Everything else went out as normal.`) +
+          '<ol style="margin:0 0 14px;padding-left:20px">' + j.problems.map(x => `<li style="margin:0 0 8px">${esc(x).replace(MOBILE_RE, telLink)}</li>`).join('') + '</ol>' +
           p('Fix the rows in the sheet. The next run picks them up automatically.') }),
-      text: `Found by ${j.source} at ${j.now}.\n\n` + j.problems.map((x, i) => `${i + 1}. ${x}`).join('\n') + '\n\nFix the rows in the sheet. The next run picks them up automatically.',
+      text: `Found at ${stampLabel(j.now)}.\n\n` + j.problems.map((x, i) => `${i + 1}. ${x.replace(MOBILE_RE, phoneShow)}`).join('\n') + '\n\nFix the rows in the sheet. The next run picks them up automatically.',
     };
   }
 

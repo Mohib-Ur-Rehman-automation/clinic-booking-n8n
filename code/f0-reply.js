@@ -101,11 +101,17 @@ if (prep.route === 'agent') {
       };
       const withTimes = lastFind.results.filter(x => x.free_times.length);
       for (const x of withTimes) {
-        chips.push({ heading: `${x.doctor}, ${x.date_label}` });
-        for (const t of pick(x.free_times, withTimes.length > 1 ? 4 : 8)) chips.push({ label: t, say: `${t} with ${x.doctor} on ${x.date_label}, please` });
+        // A few times as buttons; when there are more, the heading carries all of them for the page's "More times" button
+        const chip = t => ({ label: t, say: `${t} with ${x.doctor} on ${x.date_label}, please` });
+        const shown = pick(x.free_times, withTimes.length > 1 ? 4 : 8);
+        chips.push({ heading: `${x.doctor}, ${x.date_label}`, ...(shown.length < x.free_times.length ? { total: x.free_times.length, all: x.free_times.map(chip) } : {}) });
+        for (const t of shown) chips.push(chip(t));
       }
     }
-    steps.push({ icon: 'ai', text: `Sera replied after ${toolCalls} tool call${toolCalls === 1 ? '' : 's'}` });
+    // One find_times call for "any doctor" looks up each doctor: say so, so the roll's count matches its lines
+    const finds = results.filter(r => r.kind === 'find_times').length;
+    const lookups = results.filter(r => r.kind === 'find_times').reduce((n, r) => n + (Array.isArray(r._trace) ? r._trace.filter(x => x.icon === 'search').length : 0), 0);
+    steps.push({ icon: 'ai', text: `Sera replied after ${toolCalls} tool call${toolCalls === 1 ? '' : 's'}` + (lookups > finds ? ` · ${lookups} lookups` : '') });
   }
 }
 // Count what really happened in this chat, for Prep's caps on the next message

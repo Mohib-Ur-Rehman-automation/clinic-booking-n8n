@@ -39,7 +39,9 @@ header{grid-column:1/-1;display:flex;align-items:center;gap:14px;flex-wrap:wrap}
 
 /* chat */
 .chat{background:var(--paper);border:1px solid var(--line);border-radius:22px;box-shadow:0 18px 40px -22px rgba(15,23,42,.35);display:flex;flex-direction:column;height:min(720px,calc(100vh - 120px));min-height:460px;overflow:hidden}
-.feed{flex:1;overflow-y:auto;padding:22px 20px 8px;display:flex;flex-direction:column;gap:12px;scroll-behavior:smooth}
+.feed{flex:1;overflow-y:auto;padding:22px 20px 8px;display:flex;flex-direction:column;gap:12px;scroll-behavior:smooth;scrollbar-width:thin;scrollbar-color:#E8D9C6 transparent}
+.feed::-webkit-scrollbar{width:6px}.feed::-webkit-scrollbar-thumb{background:#E8D9C6;border-radius:6px}.feed::-webkit-scrollbar-track{background:transparent}
+.msg bdi{unicode-bidi:isolate}
 .msg{max-width:84%;padding:11px 15px;border-radius:18px;font-size:16px;line-height:1.5;overflow-wrap:anywhere}
 .msg b{font-weight:700}
 .noor{align-self:flex-start;background:#fff;border:1px solid var(--line);border-bottom-left-radius:6px}
@@ -55,13 +57,17 @@ header{grid-column:1/-1;display:flex;align-items:center;gap:14px;flex-wrap:wrap}
 .chip:hover{background:#FFD3A3}
 .chip:focus-visible,.send:focus-visible,.sugg button:focus-visible,textarea:focus-visible,.roll-toggle:focus-visible,.slip a:focus-visible{outline:3px solid var(--coral);outline-offset:2px}
 .chips.used{opacity:.45;pointer-events:none}
+.chips .grp{display:contents}
+.chip.more{background:#fff;border:1px dashed var(--teal);font-weight:500}
 
 /* token slip */
 .slip{align-self:flex-start;width:min(360px,92%);background:var(--apricot);border-radius:16px;padding:18px 20px 16px;position:relative;
   -webkit-mask:radial-gradient(circle 11px at 0 64%,#0000 98%,#000) left/51% 100% no-repeat,radial-gradient(circle 11px at 100% 64%,#0000 98%,#000) right/51% 100% no-repeat;
           mask:radial-gradient(circle 11px at 0 64%,#0000 98%,#000) left/51% 100% no-repeat,radial-gradient(circle 11px at 100% 64%,#0000 98%,#000) right/51% 100% no-repeat}
 .slip .tok{font-size:13px;color:var(--teal-deep);font-weight:600;margin:0}
-.slip .num{font-size:34px;font-weight:800;letter-spacing:.02em;margin:0 0 8px;color:var(--ink);font-variant-numeric:tabular-nums}
+.slip .num{display:block;font:800 34px var(--font);letter-spacing:.02em;margin:0 0 8px;padding:0;color:var(--ink);font-variant-numeric:tabular-nums;background:none;border:0;cursor:copy;text-align:left}
+.slip .num:focus-visible{outline:3px solid var(--coral);outline-offset:2px}
+.slip .tok span{font-weight:500;color:var(--muted)}
 .slip .when{font-size:17px;font-weight:700;margin:0}
 .slip .doc{margin:2px 0 14px;color:#3B4352;font-size:15px}
 .slip .tear{border-top:2px dashed rgba(15,118,110,.35);margin:0 -4px 12px}
@@ -77,7 +83,7 @@ header{grid-column:1/-1;display:flex;align-items:center;gap:14px;flex-wrap:wrap}
 .sugg button{font:500 14px var(--font);color:var(--ink);background:#fff;border:1px solid var(--line);border-radius:999px;padding:7px 13px;cursor:pointer}
 .sugg button:hover{border-color:var(--teal)}
 form.composer{display:flex;gap:10px;padding:12px 14px 14px;border-top:1px solid var(--line);background:#fff}
-textarea{flex:1;resize:none;font:16px/1.4 var(--font);color:var(--ink);border:1px solid var(--line);border-radius:14px;padding:11px 14px;max-height:120px;background:var(--paper)}
+textarea{flex:1;resize:none;font:16px/1.4 var(--font);color:var(--ink);border:1px solid var(--line);border-radius:14px;padding:11px 14px;max-height:120px;background:var(--paper);overflow-y:hidden}
 .send{flex:none;font:700 15px var(--font);color:#fff;background:var(--teal);border:0;border-radius:14px;padding:0 18px;cursor:pointer}
 .send:disabled{opacity:.5;cursor:default}
 
@@ -165,12 +171,14 @@ aside.roll{position:sticky;top:18px}
   };
   function icon(k) { return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' + (ICONS[k] || ICONS.skip) + '</svg>'; }
   function esc(s) { return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); }
-  function fmt(s) { return esc(s).replace(/\\*\\*([^*\\n]{1,80})\\*\\*/g, '<b>$1</b>').replace(/\\n/g, '<br>'); }
+  // Times and tokens are isolated left-to-right, so "10:00 AM" stays in order inside Urdu text
+  function fmt(s) { return esc(s).replace(/\\b\\d{1,2}(?::[0-5]\\d)?\\s?[AaPp]\\.?[Mm]\\b|\\b\\d{1,2}:[0-5]\\d\\b|\\b(?:BK|HO)-[A-Z0-9]{4,8}\\b/g, '<bdi dir="ltr">$&</bdi>')
+    .replace(/\\*\\*([^*\\n]{1,80})\\*\\*/g, '<b>$1</b>').replace(/\\n/g, '<br>'); }
   function rtl(s) { return /[\\u0600-\\u06FF]/.test(s) && (String(s).match(/[\\u0600-\\u06FF]/g) || []).length > String(s).length / 3; }
   function scroll() { feed.scrollTop = feed.scrollHeight; }
   function bubble(cls, text) {
     var d = document.createElement('div'); d.className = 'msg ' + cls; d.innerHTML = fmt(text);
-    if (rtl(text)) d.setAttribute('dir', 'rtl');
+    d.setAttribute('dir', rtl(text) ? 'rtl' : 'auto');
     feed.appendChild(d); scroll(); return d;
   }
   function printSteps(title, steps) {
@@ -188,23 +196,39 @@ aside.roll{position:sticky;top:18px}
   }
   function chipsFor(chips) {
     if (!chips || !chips.length) return;
-    var wrap = document.createElement('div'); wrap.className = 'chips';
-    chips.forEach(function (c) {
-      if (c.heading) { var p = document.createElement('p'); p.textContent = c.heading; wrap.appendChild(p); return; }
+    var wrap = document.createElement('div'), group = wrap; wrap.className = 'chips';
+    function chip(c, into) {
       var b = document.createElement('button'); b.type = 'button'; b.className = 'chip'; b.textContent = c.label;
       b.addEventListener('click', function () { wrap.classList.add('used'); ask(c.say); });
-      wrap.appendChild(b);
+      into.appendChild(b);
+    }
+    chips.forEach(function (c) {
+      if (!c.heading) return chip(c, group);
+      var p = document.createElement('p'); p.textContent = c.heading + (c.all ? ' · a few of ' + c.total + ' free times' : ''); wrap.appendChild(p);
+      group = document.createElement('span'); group.className = 'grp'; wrap.appendChild(group);
+      if (c.all) {
+        var g = group, all = c.all, m = document.createElement('button');
+        m.type = 'button'; m.className = 'chip more'; m.textContent = 'More times';
+        m.addEventListener('click', function () { g.innerHTML = ''; all.forEach(function (x) { chip(x, g); }); m.remove(); g.firstChild && g.firstChild.focus(); });
+        wrap.appendChild(m);
+      }
     });
     feed.appendChild(wrap); scroll();
   }
   function slip(t) {
     var d = document.createElement('div'); d.className = 'slip';
-    d.innerHTML = '<p class="tok">Your token</p><p class="num">' + esc(t.booking_id) + '</p>' +
+    d.innerHTML = '<p class="tok">Your token <span aria-live="polite">· tap to copy</span></p><button type="button" class="num" aria-label="Copy token ' + esc(t.booking_id) + '">' + esc(t.booking_id) + '</button>' +
       '<p class="when">' + esc(t.when) + '</p><p class="doc">' + esc(t.doctor) + (t.visit_type ? ', ' + esc(t.visit_type) : '') + '</p>' +
       '<div class="tear"></div><div class="acts">' +
-      (t.calendar_link ? '<a class="cal" target="_blank" rel="noopener" href="' + esc(t.calendar_link) + '">Add to calendar</a>' : '') +
+      (t.calendar_link ? '<a class="cal" target="_blank" rel="noopener" href="' + esc(t.calendar_link) + '">Add to Google Calendar</a>' : '') +
       (t.cancel_link ? '<a class="cxl" target="_blank" rel="noopener" href="' + esc(t.cancel_link) + '">Cancel booking</a>' : '') + '</div>' +
       '<p class="mail">' + (t.email_sent ? 'Confirmation sent to ' + esc(t.email) + '.' : 'The confirmation email didn\\'t send. Keep this token.') + '</p>';
+    var num = d.querySelector('.num'), note = d.querySelector('.tok span');
+    num.addEventListener('click', function () {
+      var done = function () { note.textContent = '· Copied'; setTimeout(function () { note.textContent = '· tap to copy'; }, 2000); };
+      if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(t.booking_id).then(done, function () { note.textContent = '· press and hold to copy'; });
+      else { var r = document.createRange(); r.selectNodeContents(num); var sel = getSelection(); sel.removeAllRanges(); sel.addRange(r); try { document.execCommand('copy'); done(); } catch (e) {} sel.removeAllRanges(); }
+    });
     feed.appendChild(d); scroll();
   }
   function setStatus(r) {
@@ -244,7 +268,7 @@ aside.roll{position:sticky;top:18px}
       d.style.cursor = 'pointer'; d.addEventListener('click', function once() { d.removeEventListener('click', once); d.remove(); feed.lastChild && feed.lastChild.className.indexOf('me') > -1 && feed.lastChild.remove(); busy = false; ask(text); });
     }).then(function () { busy = false; send.disabled = false; box.focus(); });
   }
-  function grow() { box.style.height = 'auto'; box.style.height = Math.min(box.scrollHeight, 120) + 'px'; }
+  function grow() { box.style.height = 'auto'; box.style.height = Math.min(box.scrollHeight, 120) + 'px'; box.style.overflowY = box.scrollHeight > 120 ? 'auto' : 'hidden'; }
   document.getElementById('composer').addEventListener('submit', function (e) { e.preventDefault(); ask(box.value); });
   box.addEventListener('keydown', function (e) { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); ask(box.value); } });
   box.addEventListener('input', grow);

@@ -82,6 +82,8 @@ save('email-reminder', rem.email.html);
   t("doctor's list: subject", ua.email.subject === 'Today: 3 appointments, Monday 19 Oct', ua.email.subject);
   t("doctor's list: phone formatted", /0321-1234567/.test(ua.email.html), '');
   t("doctor's list: empty day", /No appointments are booked for today/.test(ak.email.html) && ak.email.subject === 'Today: 0 appointments, Monday 19 Oct', ak.email.subject);
+  t('attention: plain time, no workflow name', /Found at 8:00 AM, Monday 19 Oct\./.test(att.email.html) && /^Found at 8:00 AM, Monday 19 Oct\./.test(att.email.text) && !/Found by/.test(att.email.html), att.email.text.slice(0, 60));
+  t('doctor list: phone is a tel: link in 0300-1234567 form', /<a href="tel:\+923001234567"[^>]*>0300-1234567<\/a>/.test(ua.email.html), '');
   t('attention: to admin, counts issues', att.email.to === 'you@example.com' && att.email.subject === 'Clinic sheet needs attention: 1 issue', att.email);
   save('email-doctor-list', ua.email.html); save('email-doctor-list-empty', ak.email.html); save('email-attention', att.email.html);
 }
@@ -126,7 +128,8 @@ save('email-reminder', rem.email.html);
   t('calendar: 5:20–5:40 PM on 20 Oct, Karachi time', u && u.includes('&dates=20261020T172000/20261020T174000') && u.includes('&ctz=Asia%2FKarachi'), u);
   t('calendar: title + details', u && decodeURIComponent(u).includes('text=Follow-up with Dr. Usman Ali') && decodeURIComponent(u).includes('Token BK-'), u);
   t('booked: calendar button in the email too', /calendar\.google\.com/.test(booked.email.html) && /Add to Google Calendar: https:\/\/calendar/.test(booked.email.text), '');
-  t('booked: two-column layout + step 3 current', /<main class="dc-card">/.test(booked.page_html) && /<aside class="dc-side"><h2>What happens next/.test(booked.page_html) && /class="now">Confirmed/.test(booked.page_html), '');
+  t('booked: two-column layout + all three steps ticked', /<main class="dc-card">/.test(booked.page_html) && /<aside class="dc-side"><h2>What happens next/.test(booked.page_html) && /class="done">Confirmed/.test(booked.page_html) && !/class="now"/.test(booked.page_html), '');
+  t('booked: calendar button is teal in page and email (same as the chat)', /<a class="dc-btn" href="https:\/\/calendar/.test(booked.page_html) && /background:#0F766E[^>]*><a href="https:\/\/calendar/.test(booked.email.html), '');
   const thuReq = both('slots', form({ 'Preferred date': '2026-10-22' }), { now: '2026-10-19 09:00' })[0];
   const thuBooked = both('check', { request: thuReq, chosen: '10:00 AM', cancel_token: 'x' }, { now: '2026-10-19 09:00' })[0];
   t('booked for a later day: reminder the day before', /<li>A reminder email arrives at 8\u00a0AM the day before your visit\.<\/li>/.test(thuBooked.page_html), (thuBooked.page_html.match(/<li>A reminder[^<]*/) || [''])[0]);
@@ -140,7 +143,7 @@ save('email-reminder', rem.email.html);
   t('logo + clinic name in page header', /<header class="dc-top"><svg/.test(booked.page_html), '');
   t('background shapes + grain in page CSS', /body::before\{top:0;right:0/.test(booked.page_html) && /feTurbulence/.test(decodeURIComponent(booked.page_html.match(/url\("(data:image\/svg\+xml,[^"]+)"\) repeat/)[1].slice(19))), '');
   t('Figtree font, not Atkinson', /family=Figtree/.test(booked.page_html) && !/Atkinson/.test(booked.page_html), '');
-  t('palette: teal headings, apricot token', /color:#0F766E;margin:0 0 8px/.test(booked.page_html) && /dc-token\{background:#FF8B5A;color:#0F172A/.test(booked.page_html), '');
+  t('palette: teal headings, token is an outlined label (not a button)', /color:#0F766E;margin:0 0 8px/.test(booked.page_html) && /dc-token\{border:1\.5px solid #0F766E;color:#0F172A/.test(booked.page_html) && !/dc-token\{background/.test(booked.page_html), '');
   t('cancelled page: book-again side panel', /Need another time\?/.test(both('booking', { id: 'BK-7KQ4M2', token: 'secret' }, { rows: [appt('2026-10-20', '17:20')] })[0].page_html), '');
   save('page-booked', booked.page_html, true);
 }

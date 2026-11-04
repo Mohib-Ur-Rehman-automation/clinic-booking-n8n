@@ -319,9 +319,14 @@ const step = (tool, obj, wrap = x => JSON.stringify([x])) => ({ action: { tool, 
   t('reply: log row for the Front Desk Log', r.log.route === 'agent' && r.log.tools_used === 1 && r.log.patient_message === 'any times?' && r.log.at === '2026-10-19 11:00 PKT', r.log);
 
   const both = f1(sheet, { doctor: 'any', date: '2026-10-20' });
+  {
+    const h = r.response.chips[0], n = ft.results[0].free_times.length;
+    t('reply: heading carries every free time for "More times" when only some are buttons', h.total === n && h.all.length === n && h.all[0].say === `${h.all[0].label} with Dr. Usman Ali on Tuesday 20 Oct, please`, h.total);
+  }
   r = reply({ sessionId: 'web-abc12345', message: 'anyone free?' }, { output: 'Both are free.', intermediateSteps: [step('find_times', both)] });
   t('reply: two doctors -> a heading and 4 spread times each', r.response.chips.length === 10 && r.response.chips[0].heading === 'Dr. Ayesha Khan, Tuesday 20 Oct' && r.response.chips[5].heading === 'Dr. Usman Ali, Tuesday 20 Oct' &&
     r.response.chips.slice(1, 5).map(c => c.label).join() === '10:00 AM,12:00 PM,5:00 PM,7:00 PM', r.response.chips.map(c => c.label || c.heading));
+  t('reply: one "any doctor" call -> "1 tool call · 2 lookups"', r.response.steps.some(x => x.icon === 'ai' && x.text === 'Sera replied after 1 tool call · 2 lookups'), r.response.steps.map(x => x.text));
 
   r = reply({ sessionId: 'web-abc12345', message: 'x' }, { output: 'ok', intermediateSteps: [step('find_times', ft, x => JSON.stringify([{ response: JSON.stringify([x]) }]))] });
   t('reply: tool answer wrapped twice is still read', r.response.chips.length === 9, r.response.chips.length);
