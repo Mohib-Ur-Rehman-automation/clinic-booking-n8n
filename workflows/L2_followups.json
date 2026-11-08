@@ -1,0 +1,300 @@
+{
+  "name": "L2 Follow-ups (Lead Engine)",
+  "nodes": [
+    {
+      "parameters": {
+        "content": "## L2 · Follow-ups\nRuns **every hour**. Finds HubSpot contacts with `engine_status = awaiting`, an email, and `next_followup_at` in the past.\n\nCadence: **#1 day 1 · #2 day 3 · #3 day 7**, then `closed`.\nA reply (L3 sets `replied`) removes them from the search, so follow-ups stop.\nPhone-only leads are never emailed.",
+        "height": 232,
+        "width": 640,
+        "color": 7
+      },
+      "id": "15e1a6b6-0859-4c5c-b786-14753b5fc93d",
+      "name": "Note d5037d",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -736,
+        -464
+      ]
+    },
+    {
+      "parameters": {
+        "content": "## Save first, then send\n**L0: advance stage** saves the new stage *before* the email goes out (top branch runs first). If anything crashes, the worst case is one missed email, never a duplicate.\n\nEvery send is logged to **Events** (`followup_1/2/3`).",
+        "height": 184,
+        "width": 600,
+        "color": 4
+      },
+      "id": "4792c55e-e20e-4b7f-8892-ff53259676c9",
+      "name": "Note 3c8689",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        16,
+        -416
+      ]
+    },
+    {
+      "parameters": {
+        "content": "## Testing tip\nIn **Settings**, set `TIME_TRAVEL_HOURS` to 25 and click **Run now (test)**: a lead created today counts as due for #1. Set it back to **0** afterwards.",
+        "height": 220,
+        "width": 440,
+        "color": 3
+      },
+      "id": "c086502a-927e-472d-878a-d6e528505055",
+      "name": "Note 169252",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -688,
+        176
+      ]
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "hours"
+            }
+          ]
+        }
+      },
+      "id": "dc75f990-08ae-46bf-9bb3-1dbb7c15315e",
+      "name": "Every hour",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        -624,
+        -192
+      ]
+    },
+    {
+      "parameters": {},
+      "id": "4e605b4c-fe1d-4d6c-97b5-1292ba42cded",
+      "name": "Run now (test)",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        -624,
+        16
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// ===== SETTINGS: edit once =====\nconst SETTINGS = {\n  L0_ID: 'PASTE_L0_WORKFLOW_ID',\n  BRAND: 'Halden Solar Co.',\n  FROM_EMAIL: 'you@example.com',\n  MAX_PER_RUN: 20,          // Gmail's published limit is ~500/day (new accounts get limited sooner); 20/hour x 24 = 480\n  TIME_TRAVEL_HOURS: 0,     // TESTING ONLY: pretend it's N hours later (e.g. 25 = day 1 is due). Keep 0 in real use.\n};\n// ===============================\nconst now = Date.now() + SETTINGS.TIME_TRAVEL_HOURS * 3600 * 1000;\nreturn [{ json: {\n  settings: SETTINGS,\n  now,\n  search_body: {\n    filterGroups: [{ filters: [\n      { propertyName: 'engine_status', operator: 'EQ', value: 'awaiting' },\n      { propertyName: 'next_followup_at', operator: 'LTE', value: String(now) },\n      { propertyName: 'email', operator: 'HAS_PROPERTY' },\n      { propertyName: 'followup_stage', operator: 'LT', value: '3' },   // finished sequences never come back\n    ] }],\n    sorts: [{ propertyName: 'next_followup_at', direction: 'ASCENDING' }],\n    properties: ['email', 'firstname', 'city', 'followup_stage', 'next_followup_at', 'lead_key'],\n    limit: Math.min(100, SETTINGS.MAX_PER_RUN),\n  },\n} }];\n"
+      },
+      "id": "4bfa2b94-b5ca-4d71-8948-b4d60d32793b",
+      "name": "Settings",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -416,
+        -96
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.hubapi.com/crm/v3/objects/contacts/search",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "hubspotAppToken",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json.search_body) }}",
+        "options": {}
+      },
+      "id": "b9e62669-e7b8-4e06-a73a-071febd697df",
+      "name": "HubSpot: due follow-ups",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -192,
+        -96
+      ],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2000
+    },
+    {
+      "parameters": {
+        "jsCode": "// Follow-up cadence (the only place it lives): #1 on day 1, #2 on day 3, #3 on day 7, then closed.\n// The stage is saved BEFORE the email is sent, so a crash can never send the same follow-up twice.\nconst s = $('Settings').first().json;\nconst now = s.now;\nconst DAY = 24 * 3600 * 1000;\nconst WAIT_AFTER = { 1: 2 * DAY, 2: 4 * DAY };       // after #1 wait 2 days, after #2 wait 4 days\nconst esc = v => String(v == null ? '' : v).replace(/[&<>\"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '\"': '&quot;', \"'\": '&#39;' }[c]));\nconst BRAND = s.settings.BRAND;\nconst F = \"'DM Sans','Helvetica Neue',Arial,sans-serif\", H = \"'DM Serif Display',Georgia,'Times New Roman',serif\";\nconst shell = ({ pre, title, body }) => `<!doctype html><html><body style=\"margin:0;padding:0;background:#F6F8F7\">\n<span style=\"display:none;max-height:0;overflow:hidden\">${esc(pre)}</span>\n<table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" style=\"background:#F6F8F7\"><tr><td align=\"center\" style=\"padding:24px 12px\">\n<table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" style=\"max-width:600px;background:#FFFFFF;border:1px solid #DFE6E4;border-radius:12px\">\n<tr><td style=\"height:4px;line-height:4px;font-size:0;background:#E0A21B;border-radius:12px 12px 0 0\">&nbsp;</td></tr>\n<tr><td style=\"padding:24px 32px 0;font-family:${H};font-size:20px;line-height:28px;color:#0F2624\"><span style=\"display:inline-block;width:18px;height:9px;background:#E0A21B;border-radius:9px 9px 0 0;margin-right:8px;vertical-align:middle\"></span>${esc(BRAND)}</td></tr>\n<tr><td style=\"padding:24px 32px 0;font-family:${H};font-size:28px;line-height:36px;color:#0F2624\">${title}</td></tr>\n<tr><td style=\"padding:12px 32px 24px;font-family:${F};font-size:16px;line-height:26px;color:#0F2624\">${body}<p style=\"margin:0\">The ${esc(BRAND)} team</p></td></tr>\n<tr><td style=\"padding:16px 32px 24px;border-top:1px solid #DFE6E4;font-family:${F};font-size:14px;line-height:20px;color:#4E6260\">${esc(BRAND)} is a demo business used to showcase an automation. No real service is offered. Reply to this email and follow-ups stop.</td></tr>\n</table></td></tr></table></body></html>`;\nconst p = t => `<p style=\"margin:0 0 16px\">${t}</p>`;\nconst TEMPLATES = {\n  1: (f, city) => ({\n    subject: `Did our message reach you, ${f}?`,\n    pre: 'Reply with your bill amount and a good time to call.',\n    title: `Hi ${esc(f)}, just checking in.`,\n    body: p('We sent you a note yesterday about your solar request and wanted to make sure it reached you.')\n      + p(`If it's easier, reply with your latest electricity bill amount and a good time to call, so we can size your system before we speak.`),\n  }),\n  2: (f, city) => ({\n    subject: `A free site survey${city ? ' in ' + city : ''}?`,\n    pre: 'We check your roof, shade and meter at no cost.',\n    title: 'The fastest way to an exact quote',\n    body: p(`Hi ${esc(f)}, a short site survey tells us exactly what your roof can carry and what it will save you. We check your roof, shade and meter, free of charge.`)\n      + p('Reply <b>YES</b> with a day that suits you and we will book it.'),\n  }),\n  3: (f) => ({\n    subject: 'Should we close your solar request?',\n    pre: 'This is our last email. Reply any time to pick it back up.',\n    title: 'Closing your request for now',\n    body: p(`Hi ${esc(f)}, we haven't heard back, so this is our last email.`)\n      + p(\"If you'd like a quote later, reply to this email any time and we'll pick it up where we left off.\"),\n  }),\n};\nconst out = [];\nfor (const r of ($input.first().json.results || []).slice(0, s.settings.MAX_PER_RUN)) {\n  const pr = r.properties || {};\n  const stage = Number(pr.followup_stage || 0);\n  if (!pr.email || !Number.isInteger(stage) || stage < 0 || stage > 2) continue;\n  const n = stage + 1;\n  const props = n < 3\n    ? { followup_stage: n, next_followup_at: now + WAIT_AFTER[n] }\n    : { followup_stage: 3, engine_status: 'closed' };\n  // Same echo rule as L0: name/city typed into a public form never become links in our emails.\n  const unglue = v => String(v || '').replace(/\\.(?=\\p{L})/gu, '. ');\n  const city = unglue(pr.city);\n  const safeCity = /^[\\p{L}\\p{M}][\\p{L}\\p{M} .,'-]*$/u.test(city) && city.split(' ').filter(Boolean).length <= 4 && city.length <= 40 ? city : '';\n  // The name gets the same check as the city: whatever is stored in HubSpot (typed in by hand, imported, older data),\n  // only a plain name is echoed. Anything else, a link or a line break included, becomes \"there\".\n  const nm = unglue(String(pr.firstname || '').trim());\n  const first = /^[\\p{L}\\p{M}][\\p{L}\\p{M} .'-]*$/u.test(nm) && nm.split(' ').filter(Boolean).length <= 4 && nm.length <= 40 ? nm : 'there';\n  const t = TEMPLATES[n](first, safeCity);\n  out.push({ json: {\n    action: 'crm_update',\n    data: { contact_id: String(r.id), properties: props },\n    n, lead_key: pr.lead_key || pr.email,\n    to: pr.email,\n    from: `${BRAND} <${s.settings.FROM_EMAIL}>`,\n    subject: t.subject,\n    html: shell(t),\n  } });\n}\nreturn out;\n"
+      },
+      "id": "4631ccb6-3f01-4788-ba46-06406f8e8980",
+      "name": "Plan follow-ups",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        32,
+        -96
+      ]
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "={{ $('Settings').first().json.settings.L0_ID }}",
+          "mode": "id"
+        },
+        "options": {
+          "waitForSubWorkflow": true
+        }
+      },
+      "id": "03360c77-bef5-4d69-952c-8bee6c277eee",
+      "name": "L0: advance stage",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.2,
+      "position": [
+        256,
+        -192
+      ]
+    },
+    {
+      "parameters": {
+        "fromEmail": "={{ $json.from }}",
+        "toEmail": "={{ $json.to }}",
+        "subject": "={{ $json.subject }}",
+        "html": "={{ $json.html }}",
+        "options": {
+          "appendAttribution": false
+        }
+      },
+      "id": "ccf631b1-481c-48e5-9832-9256cb57bd21",
+      "name": "Send follow-up",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "position": [
+        256,
+        64
+      ],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2000,
+      "webhookId": "98961fba-1cdb-422b-ac7d-e098b60320d4"
+    },
+    {
+      "parameters": {
+        "jsCode": "// One Events row per follow-up sent (followup_1 / followup_2 / followup_3).\nreturn $('Plan follow-ups').all().map(i => ({ json: { action: 'log', data: { tab: 'Events', row: {\n  idempotency_key: '', dedupe_key: i.json.lead_key, event: 'followup_' + i.json.n,\n} } } }));\n"
+      },
+      "id": "0700d424-0f4e-4bfb-a294-0b20ac98bc15",
+      "name": "Log rows",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        480,
+        64
+      ]
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "={{ $('Settings').first().json.settings.L0_ID }}",
+          "mode": "id"
+        },
+        "options": {
+          "waitForSubWorkflow": true
+        }
+      },
+      "id": "e485092d-3455-4ea7-a304-5e4240fa5abc",
+      "name": "L0: log follow-ups",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.2,
+      "position": [
+        704,
+        64
+      ]
+    }
+  ],
+  "connections": {
+    "Every hour": {
+      "main": [
+        [
+          {
+            "node": "Settings",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Run now (test)": {
+      "main": [
+        [
+          {
+            "node": "Settings",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Settings": {
+      "main": [
+        [
+          {
+            "node": "HubSpot: due follow-ups",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HubSpot: due follow-ups": {
+      "main": [
+        [
+          {
+            "node": "Plan follow-ups",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Plan follow-ups": {
+      "main": [
+        [
+          {
+            "node": "L0: advance stage",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Send follow-up",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send follow-up": {
+      "main": [
+        [
+          {
+            "node": "Log rows",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Log rows": {
+      "main": [
+        [
+          {
+            "node": "L0: log follow-ups",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "timeSavedMode": "fixed",
+    "timezone": "Asia/Karachi",
+    "callerPolicy": "workflowsFromSameOwner",
+    "availableInMCP": false
+  }
+}
