@@ -14,7 +14,7 @@
     },
     {
       "parameters": {
-        "content": "### e0 · Error Alerts\n\nShared error workflow for every project (Amazon Toolkit i1–i5, c1; Demo Clinic d0–d4; Sera f0–f3; Lead Engine L0–L4). When a production run fails, it emails the workflow name, the node that failed, the error message and a link to the execution.\n\nEach workflow points here in Settings → Error Workflow. Runs started from the editor don't trigger it.",
+        "content": "### e0 · Error Alerts\n\nShared error workflow for every project (Amazon Toolkit i1–i5, c1; Demo Clinic d0–d4; Sera f0–f3; Lead Engine L0–L4; Fair Ask FA2–FA5). When a production run fails, it emails the workflow name, the node that failed, the error message and a link to the execution.\n\nEach workflow points here in Settings → Error Workflow. Runs started from the editor don't trigger it.",
         "height": 258,
         "width": 460,
         "color": 2
