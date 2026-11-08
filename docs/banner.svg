@@ -34,7 +34,7 @@
       <rect x="96" y="272" width="104" height="34" rx="17" fill="#0F766E"/><text x="148" y="294" text-anchor="middle" fill="#FFFFFF">n8n</text>
       <rect x="212" y="272" width="168" height="34" rx="17" fill="#FF8B5A"/><text x="296" y="294" text-anchor="middle" fill="#0F172A">Google Sheets</text>
       <rect x="392" y="272" width="104" height="34" rx="17" fill="#FFE2C2"/><text x="444" y="294" text-anchor="middle" fill="#0F172A">Gmail</text>
-      <rect x="508" y="272" width="148" height="34" rx="17" fill="#FFFFFF" stroke="#E8D9C6"/><text x="582" y="294" text-anchor="middle" fill="#0F172A">6 workflows</text>
+      <rect x="508" y="272" width="148" height="34" rx="17" fill="#FFFFFF" stroke="#E8D9C6"/><text x="582" y="294" text-anchor="middle" fill="#0F172A">11 workflows</text>
     </g>
   </g>
 </svg>

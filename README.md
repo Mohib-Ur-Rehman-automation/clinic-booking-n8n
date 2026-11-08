@@ -4,7 +4,7 @@
   <img src="https://img.shields.io/badge/n8n-2.43.7_self--hosted-0F766E?style=flat-square" alt="n8n 2.43.7 self-hosted">
   <img src="https://img.shields.io/badge/data-Google_Sheets-FF8B5A?style=flat-square" alt="Google Sheets">
   <img src="https://img.shields.io/badge/email-Gmail_SMTP-6B8F7A?style=flat-square" alt="Gmail SMTP">
-  <img src="https://img.shields.io/badge/tests-25%2C638_checks_passing-0F172A?style=flat-square" alt="25,638 checks passing">
+  <img src="https://img.shields.io/badge/tests-37%2C104_checks_passing-0F172A?style=flat-square" alt="37,104 checks passing">
   <img src="https://img.shields.io/badge/running_cost-free-FFE2C2?style=flat-square&labelColor=0F766E" alt="Free to run">
 </p>
 
