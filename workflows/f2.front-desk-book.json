@@ -3,7 +3,7 @@
   "nodes": [
     {
       "parameters": {
-        "content": "## f2 · Book (Sera's tool)\nSera calls this only after the patient said yes to the details. It runs the **same checks as the booking form**:\n1. **Check Time**: d0 confirms that exact time is free that exact day (no silent move to another day).\n2. **Shape**: all seven details present, one doctor, a real visit type.\n3. **Find Times** + **Final Check**: d0 validates name, mobile and email, then re-checks the slot at the last moment.\n4. **Save**, **confirm by email**, **log** in Request Log, exactly like d1.\n\nAnything wrong returns `not_booked` with a plain reason and free alternatives, and nothing is written.",
+        "content": "## f2 · Book (Sera's tool)\nSera calls this only after the patient said yes straight after her read-back; the yes is sealed by Prep, never taken from the AI. It runs the **same checks as the booking form**:\n1. **Check Time**: d0 confirms that exact time is free that exact day (no silent move to another day).\n2. **Shape**: all seven details present, one doctor, a real visit type.\n3. **Find Times** + **Final Check**: d0 validates name, mobile and email and the online booking caps, then re-checks the slot (and the caps) at the last moment.\n4. **Save**, **confirm by email**, **log** in Request Log, exactly like d1.\n\nAnything wrong returns `not_booked` with a plain reason and free alternatives, and nothing is written.",
         "height": 290,
         "width": 700
       },

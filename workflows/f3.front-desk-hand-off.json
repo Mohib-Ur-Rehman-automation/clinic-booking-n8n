@@ -3,7 +3,7 @@
   "nodes": [
     {
       "parameters": {
-        "content": "## f3 · Hand off (Sera's tool)\nPasses a conversation to a person: medical questions, reschedules, complaints, questions Sera can't answer, or \"I want to talk to someone\".\n\nReception gets one email with a reference (HO-…), and a row lands in **Handoffs** with status Open. Without a phone number or email nothing is sent, and Sera is told to ask for one first.\n\nThe email and the sheet row each continue on error, so one failing doesn't lose the other.",
+        "content": "## f3 · Hand off (Sera's tool)\nPasses a conversation to a person: medical questions, reschedules, complaints, questions Sera can't answer, or \"I want to talk to someone\".\n\nReception gets one email with a reference (HO-…), and a row lands in **Handoffs** with status Open. Without a phone number or email nothing is sent, and Sera is told to ask for one first. Clinic-wide cap: 6 hand-offs an hour, 30 a day (set in f0's Prep); past it, Sera asks the patient to phone.\n\nThe email and the sheet row each continue on error, so one failing doesn't lose the other.",
         "height": 250,
         "width": 640
       },

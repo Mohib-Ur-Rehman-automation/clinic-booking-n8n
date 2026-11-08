@@ -717,7 +717,7 @@
     },
     {
       "parameters": {
-        "content": "### 1. Find times\nd0 checks the details (name, Pakistani mobile, email, real date) and lists the doctor's free times that day. If that day is closed, full or past, it offers the next day that has free times and says why. If nothing can be offered, Can Choose? goes to Finish with the reason.",
+        "content": "### 1. Find times\nd0 checks the details (name, Pakistani mobile, email, real date) and the online booking caps, then lists the doctor's free times that day. If that day is closed, full or past, it offers the next day that has free times and says why. If nothing can be offered, Can Choose? goes to Finish with the reason.",
         "width": 640,
         "height": 200,
         "color": 5

@@ -87,6 +87,8 @@ Node-by-node notes for each workflow are in [`workflows/README.md`](workflows/RE
 - Phone numbers typed as `0300 1234567`, `+92 300 1234567` or `0092-300-1234567`; names typed in capitals or lower case.
 - The patient declining every time, or leaving the page: nothing is booked, and it's logged as *Declined* or *Abandoned*.
 - The confirmation email failing: the booking stands, the page says the email didn't send, and the failure is logged.
+- Someone filling the calendar: one person can hold 2 upcoming visits and one mobile number 4, and online booking pauses after 10 bookings in an hour or 40 in a day (the same caps apply to Sera). Reception can still book by phone.
+- A doctor or visit type that isn't on the list, posted straight to the form: a *Check your details* page, no crash.
 
 **Cancelling**
 - Wrong, cut-off or guessed links, already cancelled, too late (under 2 hours), already passed.
@@ -113,7 +115,9 @@ Node-by-node notes for each workflow are in [`workflows/README.md`](workflows/RE
 | `d0-templates.test.js` | 55 | Every page and email: wording, escaping, calendar links, form blocks surviving n8n's HTML sanitiser |
 | `flows.test.js` | 41 | Whole workflows step by step against an in-memory sheet and mail server: races, retries, failed emails, two-tab cancels |
 | `e0.test.js` | 10 | Alert labels and the *Check first* hints |
-| `stress.test.js` | 24,809 | 4,000 hostile form submissions, 1,500 garbage sheets, date edge cases (New Year, leap day, exact cut-offs), and a seeded 60-day simulation with 263 bookings, checking that no time is ever double-booked, nobody gets two reminders, and every booked page's reminder promise is kept |
+| `stress.test.js` | 24,824 | 4,000 hostile form submissions, 1,500 garbage sheets, date edge cases (New Year, leap day, exact cut-offs), and a seeded 60-day simulation with 263 bookings, checking that no time is ever double-booked, nobody gets two reminders, and every booked page's reminder promise is kept |
+| `attacks.test.js` | 15 | The break-test's attacks on the form and Sera (see [`BREAK-TEST.md`](BREAK-TEST.md)), each first shown failing on the old code |
+| `fuzz.test.js` | 11,466 | Round 2: random and mutated input, including objects posing as text and built-in names like `constructor`, against rules that must always hold: no crash, no double booking, no caps exceeded, no links in greetings |
 
 **Live**, on self-hosted n8n 2.43.7 in October 2026:
 
@@ -125,6 +129,8 @@ Node-by-node notes for each workflow are in [`workflows/README.md`](workflows/RE
 - [x] A doctor's day off in Closures: that day skipped, the next free day offered
 - [x] Morning reminders sent and stamped; a broken row and a closure clash reported in one attention email
 - [x] Pages at phone width
+
+**Break-test, 3 November 2026.** Clinic and Sera attacked on purpose, as someone trying to misuse them would: new chat IDs to dodge limits, filling a doctor's day, links as names, hand-off spam, fake "you're booked" claims, slipping past the yes check, fake doctors, and random or malformed input (invariant fuzzing). Of 12 planned attacks, 8 got through the first version, 1 held and 3 weren't run (listed in the log); fuzzing then found 2 more crashes. All were fixed and published, and a live booking afterwards confirmed real patients still get through. Full log in [`BREAK-TEST.md`](BREAK-TEST.md); the attacks re-run with `npm test`.
 
 ## Sample output
 
@@ -140,29 +146,30 @@ Node-by-node notes for each workflow are in [`workflows/README.md`](workflows/RE
 | **Cancelled** | **The sheet: Upcoming** |
 | ![Cancelled page](docs/screenshots/cancelled.png) | ![Upcoming tab](docs/screenshots/sheet-upcoming.png) |
 
-Dr. Ayesha Khan's list for Monday 26 October (plain-text part of the email):
+Dr. Ayesha Khan's list for Thursday 5 November (plain-text part of the email):
 
 ```text
 Good morning, Dr. Ayesha Khan
 
-You have 4 appointments today, Monday 26 Oct.
+You have 3 appointments today, Thursday 5 Nov.
 
-10:00 AM  Sara Ahmed  Follow-up  0300-1234567
-10:40 AM  Omar Farooq  Check-up  0321-5550142
-11:20 AM  Hina Shah  Consultation  0333-4567890
-5:20 PM  Zainab Malik  Check-up  0345-2223344
+10:00 AM  Fatima Noor  Consultation  0322-4448899
+11:40 AM  Hina Shah  Follow-up  0333-4567890
+5:20 PM  Ahmed Siddiqui  Check-up  0301-1239876
 
 Prepared at 8:00 AM.
 ```
 
-The same morning, reception's *Needs attention* email, after Dr. Usman Ali's conference day was added to Closures:
+The same morning, reception's *Needs attention* email, after Dr. Usman Ali's day off on Friday 6 November was added to Closures:
 
 ```text
-Found by Morning reminders at 2026-10-26 08:00 PKT.
+Found at 8:00 AM, Thursday 5 Nov.
 
-1. Row 10 (BK-K7VR5S), Fatima Noor: booked with Dr. Usman Ali for Tuesday 27 Oct, 5:40 PM,
-   but Dr. Usman Ali is not available on Tuesday 27 Oct. No reminder goes out while this stands.
-   Please contact the patient on 03224448899 to move or cancel it.
+1. Row 10 (BK-H5NC2V), Bilal Raza: booked with Dr. Usman Ali for Friday 6 Nov, 5:40 PM,
+   but Dr. Usman Ali is not available on Friday 6 Nov. No reminder goes out while this stands.
+   Please contact the patient on 0321-1234567 to move or cancel it.
+
+Fix the rows in the sheet. The next run picks them up automatically.
 ```
 
 ## Setup
@@ -175,7 +182,7 @@ Found by Morning reminders at 2026-10-26 08:00 PKT.
 4. **n8n credentials.**
    - **Google Service Account API:** the service account email and the private key from the JSON file.
    - **SMTP:** host `smtp.gmail.com`, port `465`, SSL on, your Gmail address, and an [app password](https://myaccount.google.com/apppasswords) (needs 2-Step Verification).
-5. **Import** the six files in [`workflows/`](workflows/), **e0 and d0 first**.
+5. **Import** the six clinic files from [`workflows/`](workflows/) (e0, d0–d4), **e0 and d0 first**. Sera's four come later, in [Front desk setup](#front-desk-setup).
 6. **Fill in the placeholders:**
    - `YOUR_SHEET_ID` in every Google Sheets node: d0 *Read Appointments* and *Read Closures*, d1 *Save Appointment* and *Log Request*, d2 *Mark Cancelled*, d3 *Save Stamp*. Pick the service-account credential in each.
    - Pick the SMTP credential in every Send Email node, and set e0's from/to address.
@@ -204,7 +211,7 @@ npm install
 npm test
 ```
 
-**Changing the clinic:** hours, slot length, days off, notice times, doctors and visit types are all in the `CLINIC` block. Doctor and visit-type names must match the dropdowns on the d1 form and the lists at the top of the sheet script. A mismatch stops with a clear error, and e0 emails you.
+**Changing the clinic:** hours, slot length, days off, notice times, doctors and visit types are all in the `CLINIC` block. Doctor and visit-type names must match the dropdowns on the d1 form and the lists at the top of the sheet script. A mismatch shows the patient *Choose a doctor from the list* and is logged in Request Log, without an e0 email (an email per submission was the flood the break-test closed).
 
 ## Known limitations
 
@@ -230,7 +237,7 @@ Beside the chat, a **Behind the desk** panel prints every step the automation ta
 
 | Patient says | Sera | Behind the scenes |
 |---|---|---|
-| "Any free times tomorrow?" | Names a few times and shows the rest as buttons | `find_times` → d0 `availability` |
+| "Any free times tomorrow?" | Shows the free times as buttons (More times for the rest) | `find_times` → d0 `availability` |
 | "Kal shaam Dr. Usman free hain?" | Answers in Roman Urdu | The same, with the reply in the patient's language |
 | "Book 5:20 for me" | Collects name, mobile, email and visit type, repeats them, asks "shall I book it?" | `book_appointment` → d0 `availability`, `slots`, `check`, then save, email and log like d1 |
 | "Is my blood report normal?" | Won't give medical advice; offers a visit and passes the question on | `hand_off` → email to reception + a row in **Handoffs** |
@@ -240,14 +247,14 @@ A booking lands in the chat as a **token slip** with *Add to calendar* and *Canc
 
 ### Sera in action
 
-From the live test on 20 October 2026 (Groq model, real Google Sheet and Gmail):
+Screenshots follow one fictional patient, Fatima Noor, through the chat (the same booking appears in the doctor's list above). The live tests with Groq, the real Google Sheet and Gmail are listed under [How Sera was tested](#how-sera-was-tested).
 
 | | |
 |---|---|
 | ![Sera finds free times; the receipt roll shows each step](docs/screenshots/sera-chat.png) | ![A booking in Roman Urdu ends in a token slip](docs/screenshots/sera-token.png) |
-| *After hours: free times as buttons, every step printed on the roll* | *Booked in Roman Urdu: token slip, calendar and cancel buttons* |
-| ![A question in Urdu script, answered in Urdu script](docs/screenshots/sera-urdu.png) | ![A request for a person becomes a hand-off with a reference](docs/screenshots/sera-handoff.png) |
-| *Urdu script in, Urdu script out* | *"I want to talk to a person": reception emailed, Handoffs row, reference HO-JGQKW* |
+| *Free times as buttons, with More times for the rest; every step printed on the roll* | *Read back and confirmed in Roman Urdu: token slip, calendar and cancel buttons* |
+| ![A question in Urdu script, answered in Urdu script](docs/screenshots/sera-urdu.png) | ![A reschedule request becomes a hand-off with a reference](docs/screenshots/sera-handoff.png) |
+| *Urdu script in, Urdu script out* | *A reschedule request: reception emailed, Handoffs row, reference HO-4TQ8N* |
 
 ### What it replaces
 
@@ -299,7 +306,8 @@ d0 gained two read-only actions for this: `info` (open now? next opening, the ne
 - No medical advice: Sera offers a visit or a hand-off instead.
 - The AI provider down or out of quota: the patient gets a fallback reply with the clinic's phone number, and the panel shows why.
 - **No booking without the patient's own yes.** Prep checks the patient's message for a yes (English, Roman Urdu, Urdu) and seals it into a *gate* that the booking tool reads straight from Prep, never from the AI. Tested on n8n with a model forced to book without consent: refused, nothing saved.
-- **Caps enforced in code, not the prompt:** 2 bookings and 2 hand-offs per chat; 2 upcoming visits per person (mobile number + full name, `maxUpcomingPerPatient` in d0) and 4 per mobile number; 40 messages per chat; 2 seconds between messages; 400 AI messages and 3,000 chats a day. Past a limit, the patient gets the phone number and the booking form, and the AI isn't called. Emergencies are never limited.
+- **Caps enforced in code, not the prompt.** Counted from the sheet in d0, shared with the booking form: 2 upcoming visits per person (mobile number + full name), 4 per mobile number, 10 online bookings an hour and 40 a day across the clinic. Clinic-wide in f0: 6 hand-offs an hour and 30 a day, 400 AI replies and 3,000 chats a day, and 60 AI replies a day per visitor address when n8n sits behind a proxy. Per chat: 2 bookings, 2 hand-offs, 40 messages, 2 seconds between messages. Past a limit, the patient gets the phone number and the booking form, and the AI isn't called. Emergencies are never limited.
+- **No made-up bookings.** If Sera says something is booked, or gives a BK- token, without a real booking in that chat, the reply is replaced before the patient sees it.
 - Prompt-injection attempts ("ignore your instructions"): Sera's briefing tells her to stay in role, and even if she's talked out of it, her tools can only check times, book through d0 behind the gate, or email reception behind its own cap.
 - Everything Sera writes is escaped in the browser; only **bold** and line breaks become HTML. Hostile `Host` headers can't change where the page sends messages.
 
@@ -311,7 +319,6 @@ d0 gained two read-only actions for this: `info` (open now? next opening, the ne
 |---|---:|---|
 | `d0-frontdesk.test.js` | 340 | `info` (open or closed at every hour, next opening, closures) and `availability` (doctor names, dates, moves, full days), plus 2,000 random requests that must never crash d0 or offer a taken time |
 | `frontdesk-flows.test.js` | 183 | f1, f2 and f3 end to end against an in-memory sheet and mail server (races, retries, refused details, failed emails, escaping), Prep (emergencies in three languages, odd bodies, every limit), the sealed gate (no yes, no gate, forged gate, caps), Reply (time buttons, token slip, hand-offs, AI failures) and the page script |
-
 | `redteam.test.js` | 45 | The red-team grader itself: fed fake replies that leak instructions, give doses (English and Urdu word order), invent times or phone numbers, answer in the wrong language or book when they mustn't, it must catch each one and pass the clean ones |
 
 **Red team against the real model** ([r0 · sera-red-team](#red-team-r0)): 48 attack conversations in 8 categories. The bar is every critical script passing and 95%+ overall. Results of the live run:

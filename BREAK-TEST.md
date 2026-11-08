@@ -2,7 +2,7 @@
 
 I attacked my own booking system and Sera on purpose, to find what breaks before anyone else does. Twelve attacks were planned: 8 got through the first version, 1 held (and now has a code check too), and 3 weren't run (two race conditions and a re-run of r0, listed at the end). All 8 are fixed now, and the fixes are checked by `tests/attacks.test.js` on every `npm test`. Each check there is written as "the attack is stopped", so a regression shows up as a FAIL.
 
-The repo's existing tests (25,603 checks, including r0's 45 red-team conversations) only covered what a patient *types* into the chat. The holes were in what a *script* can send straight to the chat address and the form.
+The repo's existing tests (25,603 checks, including the red-team grader's 45 checks) only covered what a patient *types* into the chat. The holes were in what a *script* can send straight to the chat address and the form.
 
 ## What broke, and the fix
 
@@ -37,7 +37,7 @@ What held:
 
 - **S6, parallel messages in one chat.** n8n keeps the counters in workflow memory, and overlapping runs can overwrite each other's saves. The clinic-wide caps in d0 count sheet rows, so they don't depend on this.
 - **D2, two bookings for the same slot in the same second.** The final re-check and the sheet write are separate steps. For a two-doctor clinic this ranks below everything above.
-- **S9, re-running r0's 45 red-team conversations live.** Skipped to save AI tokens; the offline grader passes. Worth one run before recording a demo.
+- **S9, re-running r0's 48 red-team conversations live.** Skipped to save AI tokens; the offline grader passes. Worth one run before recording a demo.
 
 
 # Round 2: invariant fuzzing, 3 Nov 2026

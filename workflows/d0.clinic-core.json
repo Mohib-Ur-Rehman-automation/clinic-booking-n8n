@@ -106,7 +106,7 @@
     },
     {
       "parameters": {
-        "content": "## d0 · Clinic Core\nThe only place the clinic's rules and look live. d1–d4 call it with an **action** and **data**; it reads the sheet, decides, and returns the answer with its page or email already built. It never writes to the sheet.\n\n**Change the clinic here:** hours, slot length, days off, doctors and their emails, booking window, notice times, reminder hour, URLs: all in the CLINIC block at the top of Clinic Rules. Colours and wording: Clinic Templates.\n\nThe Doctor and Visit type dropdowns on the d1 form must match CLINIC exactly (a mismatch stops with a clear error, and e0 emails you).",
+        "content": "## d0 · Clinic Core\nThe only place the clinic's rules and look live. d1–d4 and Sera (f0–f3) call it with an **action** and **data**; it reads the sheet, decides, and returns the answer with its page or email already built. It never writes to the sheet.\n\n**Change the clinic here:** hours, slot length, days off, doctors and their emails, booking window, notice times, reminder hour, URLs: all in the CLINIC block at the top of Clinic Rules. Colours and wording: Clinic Templates.\n\nThe Doctor and Visit type dropdowns on the d1 form must match CLINIC exactly. A mismatch shows the patient \"Choose a doctor from the list\" and is logged in Request Log (no e0 email, on purpose).\n\n**Online booking caps** (per person, per phone, per hour, per day) are in CLINIC too, counted from the sheet, so the form and Sera share them.",
         "width": 900,
         "height": 300,
         "color": 2
@@ -122,7 +122,7 @@
     },
     {
       "parameters": {
-        "content": "### Actions\n**slots**: page 1 of booking → free times for that doctor and date, or the next day that has some, or why not\n**check**: the time the patient picked → book it, or why not (taken, too close, closed)\n**reminders**: who gets a reminder this morning + rows that can't get one\n**schedule**: each doctor's list for today + a health check of the whole sheet\n**booking**: a cancel link was opened → can it be cancelled?\n\nRead nodes run once (Settings → Execute Once) and output an empty item when a tab is empty.\n**info**: the front desk's facts: open now, the next 14 days, doctors, hours (f0)\n**availability**: free times before anyone gives details, never throws on bad input (f1, f2)",
+        "content": "### Actions\n**slots**: page 1 of booking → free times for that doctor and date, or the next day that has some, or why not\n**check**: the time the patient picked → book it, or why not (taken, too close, closed)\n**reminders**: who gets a reminder this morning + rows that can't get one\n**schedule**: each doctor's list for today + a health check of the whole sheet\n**booking**: a cancel link was opened → can it be cancelled?\n**info**: the front desk's facts: open now, the next 14 days, doctors, hours (f0)\n**availability**: free times before anyone gives details, never throws on bad input (f1, f2)\n\nRead nodes run once (Settings → Execute Once) and output an empty item when a tab is empty.",
         "width": 900,
         "height": 280,
         "color": 7

@@ -182,7 +182,7 @@ Start it with **Execute workflow** in the editor only (see the note on the canva
 |---|---|---|---|
 | 1 | **Run Red Team** | Manual Trigger | |
 | 2 | **Settings** | Code · [`r0-settings.js`](../code/r0-settings.js) | Chat address, pause between messages, test phone and email, report address, optional script filter. |
-| 3 | **Attack Scripts** | Code · [`r0-scripts.js`](../code/r0-scripts.js) | The 45 conversations, each with its category, severity and checks. |
+| 3 | **Attack Scripts** | Code · [`r0-scripts.js`](../code/r0-scripts.js) | The 48 conversations, each with its category, severity and checks. |
 | 4 | **One at a Time** | Loop Over Items | One script per pass, so no Code node runs near n8n's time limit. |
 | 5 | **Play & Grade** | Code · [`r0-play.js`](../code/r0-play.js) | Plays the conversation through Sera's chat webhook (with pauses for the AI provider's per-minute limit), then grades every reply. |
 | 6 | **Report** | Code · [`r0-report.js`](../code/r0-report.js) | Pass rates by category and severity, the failures, any test bookings, the summary email. |

@@ -3,7 +3,7 @@
   "nodes": [
     {
       "parameters": {
-        "content": "## f0 · Front desk: Sera\nA chat receptionist for the clinic, on a page n8n serves itself at **/webhook/front-desk**.\n\n**Top row:** the page. **Bottom row:** every chat message.\n1. **Clinic Info** asks d0 for today's facts (open now? the next 14 days, doctors, hours).\n2. **Prep** catches emergencies with plain rules, so they never wait on the AI, works out the patient's language, and writes Sera's briefing. If d0 can't be reached (no internet), it answers politely instead of failing.\n3. **Sera** (Groq gpt-oss-120b in Chat Model; if it fails or runs out of free tokens, Qwen 3.8 in Fallback Model takes over, with its own free allowance) answers, using three tools: find times, book, hand off. All three go through d0, so the chat follows exactly the same rules as the booking form.\n4. **Reply** builds the bubble, the time buttons, the token slip and the \"Behind the desk\" steps.\n5. **Answer** sends it back; the chat is logged in **Front Desk Log**.",
+        "content": "## f0 · Front desk: Sera\nA chat receptionist for the clinic, on a page n8n serves itself at **/webhook/front-desk**.\n\n**Top row:** the page. **Bottom row:** every chat message.\n1. **Clinic Info** asks d0 for today's facts (open now? the next 14 days, doctors, hours).\n2. **Prep** catches emergencies with plain rules, so they never wait on the AI, works out the patient's language, enforces the chat and clinic-wide limits, and writes Sera's briefing. If d0 can't be reached (no internet), it answers politely instead of failing.\n3. **Sera** (Groq gpt-oss-120b in Chat Model; if it fails or runs out of free tokens, Qwen 3.8 in Fallback Model takes over, with its own free allowance) answers, using three tools: find times, book, hand off. All three go through d0, so the chat follows exactly the same rules as the booking form.\n4. **Reply** builds the bubble, the time buttons, the token slip and the \"Behind the desk\" steps.\n5. **Answer** sends it back; the chat is logged in **Front Desk Log**.",
         "height": 330,
         "width": 760
       },
@@ -18,7 +18,7 @@
     },
     {
       "parameters": {
-        "content": "### Safety\n- Emergencies (chest pain, can't breathe, suicide... in English, Roman Urdu and Urdu) get a fixed reply with **1122**. The AI is skipped on purpose.\n- Sera never gives medical advice; it offers a visit or a hand-off.\n- If the AI fails, the patient gets a fallback reply with the clinic's phone number, never a blank.",
+        "content": "### Safety\n- Emergencies (chest pain, can't breathe, suicide... in English, Roman Urdu and Urdu) get a fixed reply with **1122**. The AI is skipped on purpose.\n- Sera never gives medical advice; it offers a visit or a hand-off.\n- If the AI fails, the patient gets a fallback reply with the clinic's phone number, never a blank.\n- A yes only counts straight after Sera reads the booking back; Prep seals it, and f2 checks it.\n- If Sera claims a booking or a BK- token that doesn't exist in this chat, Reply replaces the message.\n- Limits are in Prep (LIMITS), not the prompt: per chat, per visitor address and clinic-wide.",
         "height": 210,
         "width": 520,
         "color": 3
